@@ -87,10 +87,10 @@ interface IMedicalAccess {
 
     function registerPatient() external;
 
-    function renewDoctorLicense(
-        address doctorAddress,
-        uint256 newExpiry
-    ) external;
+    // function renewDoctorLicense(
+    //     address doctorAddress,
+    //     uint256 newExpiry
+    // ) external;
 
     // System Controls
     function togglePause(uint256 durationHours) external;

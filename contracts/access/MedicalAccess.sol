@@ -22,6 +22,8 @@ contract MedicalAccess is AccessControl, IMedicalAccess {
 
     address[] public doctorList;
     address[] public pharmacistList;
+    mapping(address => uint256) private doctorIndex;
+    mapping(address => uint256) private pharmacistIndex;
 
     bool public emergencyPause;
     uint256 public pauseExpiry;
@@ -40,6 +42,9 @@ contract MedicalAccess is AccessControl, IMedicalAccess {
     }
 
     modifier notPaused() {
+        if (emergencyPause && block.timestamp >= pauseExpiry) {
+            emergencyPause = false; // Auto-expire
+        }
         require(!emergencyPause, "Contract paused");
         _;
     }
@@ -76,13 +81,22 @@ contract MedicalAccess is AccessControl, IMedicalAccess {
             isActive: true
         });
         doctorList.push(doctorAddress);
+        doctorIndex[doctorAddress] = doctorList.length;
         emit DoctorRegistered(doctorAddress, licenseHash, licenseExpiry);
     }
 
     function revokeDoctor(
         address doctorAddress
     ) external override onlyAdmin notPaused {
+        uint256 index = doctorIndex[doctorAddress];
+        require(index > 0, "Not an active doctor");
         require(doctorRegistry[doctorAddress].isActive, "Not an active doctor");
+
+        doctorList[index - 1] = doctorList[doctorList.length - 1];
+        doctorIndex[doctorList[index - 1]] = index; // Update swapped item
+        doctorList.pop();
+        doctorIndex[doctorAddress] = 0;
+
         _revokeRole(DOCTOR_ROLE, doctorAddress);
         doctorRegistry[doctorAddress].isActive = false;
         emit DoctorRevoked(doctorAddress);
@@ -105,16 +119,25 @@ contract MedicalAccess is AccessControl, IMedicalAccess {
             isVerified: true
         });
         pharmacistList.push(pharmacistAddress);
+        pharmacistIndex[pharmacistAddress] = pharmacistList.length;
         emit PharmacistRegistered(pharmacistAddress, pharmacyId);
     }
 
     function revokePharmacist(
         address pharmacistAddress
     ) external override onlyAdmin {
+        uint256 index = pharmacistIndex[pharmacistAddress];
+        require(index > 0, "Pharmacist not registered");
         require(
             pharmacistRegistry[pharmacistAddress].isVerified,
             "Pharmacist not verified"
         );
+
+        pharmacistList[index - 1] = pharmacistList[pharmacistList.length - 1];
+        pharmacistIndex[pharmacistList[index - 1]] = index; // Update swapped item
+        pharmacistList.pop();
+        pharmacistIndex[pharmacistAddress] = 0;
+
         _revokeRole(PHARMACIST_ROLE, pharmacistAddress);
         emit PharmacistRevoked(pharmacistAddress);
     }
@@ -126,13 +149,13 @@ contract MedicalAccess is AccessControl, IMedicalAccess {
         emit PatientRegistered(msg.sender);
     }
 
-    function renewDoctorLicense(
-        address doctorAddress,
-        uint256 newExpiry
-    ) external override onlyAdmin notPaused {
-        require(newExpiry > block.timestamp, "Invalid expiry date");
-        doctorRegistry[doctorAddress].expiryDate = newExpiry;
-    }
+    // function renewDoctorLicense(
+    //     address doctorAddress,
+    //     uint256 newExpiry
+    // ) external override onlyAdmin notPaused {
+    //     require(newExpiry > block.timestamp, "Invalid expiry date");
+    //     doctorRegistry[doctorAddress].expiryDate = newExpiry;
+    // }
 
     function togglePause(uint256 durationHours) external override onlyAdmin {
         emergencyPause = !emergencyPause;
