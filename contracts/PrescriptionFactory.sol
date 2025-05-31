@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import "./access/MedicalAccess.sol";
 import "./prescription/PrescriptionRegistry.sol";
 import "./tokens/PrescriptionToken.sol";
+import "hardhat/console.sol";
 
 /**
  * @title Prescription System Factory
@@ -30,7 +31,11 @@ contract PrescriptionFactory {
         medicalAccess = new MedicalAccess();
 
         // Deploy registry with medical access reference
-        prescriptionRegistry = new PrescriptionRegistry(address(medicalAccess));
+        prescriptionRegistry = new PrescriptionRegistry(
+            address(medicalAccess),
+            address(0),
+            address(0)
+        );
 
         // Deploy the ERC-721 prescription token
         prescriptionToken = new PrescriptionToken(baseTokenURI);

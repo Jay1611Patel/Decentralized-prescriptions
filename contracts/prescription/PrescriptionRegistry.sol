@@ -8,6 +8,7 @@ import "../interfaces/IMedicalAccess.sol";
 import "../interfaces/IPrescriptionRegistry.sol";
 import "../interfaces/IPrescriptionToken.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "hardhat/console.sol";
 
 contract PrescriptionRegistry is AccessControl, IPrescriptionRegistry {
     IMedicalAccess public medicalAccess;
@@ -21,9 +22,17 @@ contract PrescriptionRegistry is AccessControl, IPrescriptionRegistry {
     bytes32 public constant PHARMACIST_ROLE = keccak256("PHARMACIST_ROLE");
     bytes32 public constant DOCTOR_ROLE = keccak256("DOCTOR_ROLE");
 
-    constructor(address _medicalAccess) {
+    constructor(
+        address _medicalAccess,
+        address doctorAddress,
+        address pharmacistAddress
+    ) {
         medicalAccess = IMedicalAccess(_medicalAccess);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(DOCTOR_ROLE, doctorAddress);
+        _grantRole(PHARMACIST_ROLE, pharmacistAddress);
+        _setRoleAdmin(DOCTOR_ROLE, DEFAULT_ADMIN_ROLE);
+        _setRoleAdmin(PHARMACIST_ROLE, DEFAULT_ADMIN_ROLE);
     }
 
     function setPrescriptionToken(
@@ -36,7 +45,7 @@ contract PrescriptionRegistry is AccessControl, IPrescriptionRegistry {
         address patient,
         uint256 expiryDate,
         string calldata prescriptionHash
-    ) external override {
+    ) external override onlyRole(DOCTOR_ROLE) {
         require(
             medicalAccess.isActive(msg.sender),
             "Only active doctors can create prescription"
@@ -44,6 +53,10 @@ contract PrescriptionRegistry is AccessControl, IPrescriptionRegistry {
         require(
             expiryDate > block.timestamp,
             "Expiry date should be in future"
+        );
+        require(
+            medicalAccess.hasRole(medicalAccess.PATIENT_ROLE(), patient),
+            "Patient not registered"
         );
         require(patient != address(0), "Invalid Patient Address");
         require(
@@ -129,6 +142,10 @@ contract PrescriptionRegistry is AccessControl, IPrescriptionRegistry {
         address doctor
     ) external view override returns (uint256[] memory) {
         return _doctorPrescriptions[doctor];
+    }
+
+    function getPrescriptionCount() external view override returns (uint256) {
+        return prescriptionCount;
     }
 
     function supportsInterface(

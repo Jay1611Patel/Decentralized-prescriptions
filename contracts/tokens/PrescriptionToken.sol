@@ -32,12 +32,6 @@ contract PrescriptionToken is ERC721, AccessControl, IPrescriptionToken {
     }
 
     function burn(uint256 tokenId) external override onlyRole(BURNER_ROLE) {
-        require(
-            ownerOf(tokenId) == msg.sender ||
-                getApproved(tokenId) == msg.sender ||
-                isApprovedForAll(ownerOf(tokenId), msg.sender),
-            "Not owner nor approved"
-        );
         _burn(tokenId);
         delete _prescriptionTokens[tokenId];
     }

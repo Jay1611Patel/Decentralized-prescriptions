@@ -43,4 +43,6 @@ interface IPrescriptionRegistry {
     function getDoctorPrescriptions(
         address doctor
     ) external returns (uint256[] memory);
+
+    function getPrescriptionCount() external returns (uint256);
 }

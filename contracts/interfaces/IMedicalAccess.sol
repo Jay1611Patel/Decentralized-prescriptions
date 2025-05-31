@@ -37,6 +37,8 @@ interface IMedicalAccess {
 
     function ADMIN_ROLE() external pure returns (bytes32);
 
+    function PATIENT_ROLE() external view returns (bytes32);
+
     // Role Verification
     function isActive(address doctorAddress) external view returns (bool);
 

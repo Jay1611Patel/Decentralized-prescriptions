@@ -8,10 +8,11 @@ import "../interfaces/IMedicalAccess.sol";
 
 contract MedicalAccess is AccessControl, IMedicalAccess {
     // Constants
-    bytes32 public constant DOCTOR_ROLE = keccak256("DOCTOR_ROLE");
-    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
-    bytes32 public constant PHARMACIST_ROLE = keccak256("PHARMACIST_ROLE");
-    bytes32 public constant PATIENT_ROLE = keccak256("PATIENT_ROLE");
+    bytes32 public constant override DOCTOR_ROLE = keccak256("DOCTOR_ROLE");
+    bytes32 public constant override ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    bytes32 public constant override PHARMACIST_ROLE =
+        keccak256("PHARMACIST_ROLE");
+    bytes32 public constant override PATIENT_ROLE = keccak256("PATIENT_ROLE");
 
     //Storage
     // doctorRegistry[address] = DoctorProfile("QmXYZ", 1735689600, true);
