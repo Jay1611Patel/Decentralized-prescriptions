@@ -6,6 +6,7 @@ require("hardhat-gas-reporter")
 require("dotenv").config()
 require("solidity-coverage")
 require("hardhat-deploy")
+require("hardhat-abi-exporter")
 
 /** @type import('hardhat/config').HardhatUserConfig */
 
@@ -59,5 +60,13 @@ module.exports = {
     },
     mocha: {
         timeout: 500000,
+    },
+    abiExporter: {
+        path: "./frontend/src/abi",
+        runOnCompile: true,
+        clear: true,
+        flat: true,
+        only: ["MedicalAccess", "PrescriptionRegistry", "PrescriptionToken"],
+        spacing: 2,
     },
 }

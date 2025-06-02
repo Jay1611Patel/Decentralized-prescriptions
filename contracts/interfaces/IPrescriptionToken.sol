@@ -8,7 +8,7 @@ interface IPrescriptionToken is IERC721 {
      * @dev Mints a new prescription NFT
      * @param to The patient address receiving the prescription
      * @param tokenId The unique prescription ID
-     * @param tokenURI The metadata URI (can be empty if using baseURI)
+     * @param tokenURI The metadata URI (relative to base URI)
      */
     function mint(
         address to,
@@ -34,4 +34,9 @@ interface IPrescriptionToken is IERC721 {
      * @param baseURI The new base URI
      */
     function setBaseURI(string calldata baseURI) external;
+
+    /**
+     * @dev Returns the base URI
+     */
+    function getBaseURI() external view returns (string memory);
 }
