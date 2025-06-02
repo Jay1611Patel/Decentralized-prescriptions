@@ -28,7 +28,7 @@ const Title = styled.h1`
 `;
 
 const Button = styled.button`
-  background-color: #f6851b; /* MetaMask orange */
+  background-color: #f6851b;
   color: white;
   border: none;
   padding: 12px 24px;
@@ -65,7 +65,7 @@ const RegisterButton = styled(Button)`
 const AddressDisplay = styled.div`
   margin: 1rem 0;
   padding: 0.5rem;
-  background-color:rgb(67, 172, 205);
+  background-color: rgb(67, 172, 205);
   border-radius: 4px;
   word-break: break-all;
   font-family: monospace;
@@ -96,22 +96,27 @@ const Login = () => {
     error,
     connectWallet,
     isMetaMaskInstalled,
-    registerAsPatient
+    registerAsPatient,
+    shouldLogout
   } = useWallet();
   
   const navigate = useNavigate();
   const [isRegistering, setIsRegistering] = useState(false);
   const [registrationError, setRegistrationError] = useState(null);
 
-  // Handle redirection based on role
+  // Handle redirection based on role and logout state
   useEffect(() => {
-    if (!account || loading) return;
+    if (loading) return;
 
-    if (role) {
-      // Redirect to role-specific dashboard
+    if (shouldLogout) {
+      navigate('/');
+      return;
+    }
+
+    if (account && role) {
       navigate(`/${role}-dashboard`);
     }
-  }, [account, role, loading, navigate]);
+  }, [account, role, loading, navigate, shouldLogout]);
 
   const handleConnect = async () => {
     try {

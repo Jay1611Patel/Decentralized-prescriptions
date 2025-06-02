@@ -11,8 +11,8 @@ export const WalletProvider = ({ children }) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState(null);
   const [contract, setContract] = useState(null);
+  const [shouldLogout, setShouldLogout] = useState(false);
 
-  // Get contract address from environment
   const contractAddress = import.meta.env.VITE_APP_MEDICAL_ACCESS_ADDRESS;
 
   const initContract = useCallback(async (provider) => {
@@ -30,7 +30,6 @@ export const WalletProvider = ({ children }) => {
     return contract;
   }, [contractAddress]);
 
-  // Check user role
   const checkUserRole = useCallback(async (contract, address) => {
     if (!contract) return null;
     
@@ -53,44 +52,37 @@ export const WalletProvider = ({ children }) => {
     }
   }, []);
 
-  const connectWallet = useCallback(async () => {
-    if (!window.ethereum) {
-      setError('MetaMask not installed');
-      return;
-    }
-
-    setIsConnecting(true);
-    setError(null);
-
-    try {
-      const accounts = await window.ethereum.request({ 
-        method: 'eth_requestAccounts' 
-      });
-
-      if (accounts.length > 0) {
-        const provider = new ethers.BrowserProvider(window.ethereum);
-        const contract = await initContract(provider);
-        const userRole = await checkUserRole(contract, accounts[0]);
-        
-        setAccount(accounts[0]);
-        setRole(userRole);
-      }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setIsConnecting(false);
-      setLoading(false);
+  // Handle account changes (disconnections/switches)
+  const handleAccountsChanged = useCallback(async (accounts) => {
+    if (accounts.length === 0) {
+      // Account disconnected
+      setAccount(null);
+      setRole(null);
+      setContract(null);
+      setShouldLogout(true); // Trigger logout
+    } else {
+      // Account connected or switched
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const contract = await initContract(provider);
+      const userRole = await checkUserRole(contract, accounts[0]);
+      
+      setAccount(accounts[0]);
+      setRole(userRole);
+      setShouldLogout(false);
     }
   }, [initContract, checkUserRole]);
 
-  // Check initial connection
+  // Set up event listeners
   useEffect(() => {
-    const checkConnection = async () => {
-      if (!window.ethereum) {
-        setLoading(false);
-        return;
-      }
+    if (!window.ethereum) {
+      setLoading(false);
+      return;
+    }
 
+    window.ethereum.on('accountsChanged', handleAccountsChanged);
+
+    // Check initial connection
+    const checkInitialConnection = async () => {
       try {
         const accounts = await window.ethereum.request({ method: 'eth_accounts' });
         if (accounts.length > 0) {
@@ -108,8 +100,33 @@ export const WalletProvider = ({ children }) => {
       }
     };
 
-    checkConnection();
-  }, [initContract, checkUserRole]);
+    checkInitialConnection();
+
+    return () => {
+      window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+    };
+  }, [handleAccountsChanged, initContract, checkUserRole]);
+
+  const connectWallet = useCallback(async () => {
+    if (!window.ethereum) {
+      setError('MetaMask not installed');
+      return;
+    }
+
+    setIsConnecting(true);
+    setError(null);
+
+    try {
+      const accounts = await window.ethereum.request({ 
+        method: 'eth_requestAccounts' 
+      });
+      handleAccountsChanged(accounts);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [handleAccountsChanged]);
 
   const value = {
     account,
@@ -117,10 +134,11 @@ export const WalletProvider = ({ children }) => {
     loading,
     isConnecting,
     error,
+    shouldLogout, // Add this to context
     connectWallet,
     isMetaMaskInstalled: !!window.ethereum,
     registerAsPatient: async () => {
-      if (!contract) return false;
+      if (!contract || !account) return false;
       try {
         const tx = await contract.registerPatient();
         await tx.wait();
