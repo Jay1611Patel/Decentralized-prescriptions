@@ -185,6 +185,14 @@ contract MedicalAccess is AccessControl, IMedicalAccess {
             pharmacistRegistry[account].isVerified;
     }
 
+    function revokeRole(
+        bytes32 role,
+        address account
+    ) public override onlyRole(getRoleAdmin(role)) {
+        super.revokeRole(role, account);
+        emit RoleRevokedWithSender(role, account);
+    }
+
     function getAllDoctors() external view override returns (address[] memory) {
         return doctorList;
     }

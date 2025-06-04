@@ -29,6 +29,7 @@ interface IMedicalAccess {
     event PharmacistRevoked(address indexed pharmacist);
     event PatientRegistered(address indexed account);
     event PauseToggled(bool isPaused);
+    event RoleRevokedWithSender(bytes32 indexed role, address indexed account);
 
     // Role Constants
     function DOCTOR_ROLE() external pure returns (bytes32);

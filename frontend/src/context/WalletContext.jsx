@@ -26,6 +26,20 @@ export const WalletProvider = ({ children }) => {
       MedicalAccessABI.abi,
       signer
     );
+
+    // Add explicit event filters for ambiguous events
+    contract.filters.RoleRevoked = (role, account, sender) => {
+      return {
+        address: contractAddress,
+        topics: [
+          ethers.id("RoleRevoked(bytes32,address,address)"),
+          role ? ethers.zeroPadValue(ethers.toBeHex(role), 32) : null,
+          account ? ethers.getAddress(account) : null,
+          sender ? ethers.getAddress(sender) : null
+        ].filter(t => t !== null)
+      };
+    };
+
     setContract(contract);
     return contract;
   }, [contractAddress]);
@@ -54,23 +68,50 @@ export const WalletProvider = ({ children }) => {
 
   // Handle account changes (disconnections/switches)
   const handleAccountsChanged = useCallback(async (accounts) => {
+  try {
     if (accounts.length === 0) {
-      // Account disconnected
+      // Handle disconnection
       setAccount(null);
       setRole(null);
       setContract(null);
-      setShouldLogout(true); // Trigger logout
-    } else {
-      // Account connected or switched
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const contract = await initContract(provider);
-      const userRole = await checkUserRole(contract, accounts[0]);
-      
-      setAccount(accounts[0]);
-      setRole(userRole);
-      setShouldLogout(false);
+      setShouldLogout(true);
+      return;
     }
-  }, [initContract, checkUserRole]);
+
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    
+    // Initialize contract with retry logic
+    let retries = 3;
+    let contract;
+    let lastError;
+    
+    while (retries > 0) {
+      try {
+        contract = await initContract(provider);
+        break;
+      } catch (error) {
+        lastError = error;
+        retries--;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    if (!contract) {
+      throw lastError || new Error("Failed to initialize contract after retries");
+    }
+
+    const userRole = await checkUserRole(contract, accounts[0]);
+    
+    setAccount(accounts[0]);
+    setRole(userRole);
+    setContract(contract);
+    setShouldLogout(false);
+    setError(null);
+  } catch (error) {
+    console.error("Account change error:", error);
+    setError(error);
+  }
+}, [initContract, checkUserRole]);
 
   // Set up event listeners
   useEffect(() => {
@@ -134,7 +175,7 @@ export const WalletProvider = ({ children }) => {
     loading,
     isConnecting,
     error,
-    shouldLogout, // Add this to context
+    shouldLogout, 
     connectWallet,
     isMetaMaskInstalled: !!window.ethereum,
     registerAsPatient: async () => {
