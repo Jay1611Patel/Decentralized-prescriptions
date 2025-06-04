@@ -29,6 +29,7 @@ interface IMedicalAccess {
     event PharmacistRevoked(address indexed pharmacist);
     event PatientRegistered(address indexed account);
     event PauseToggled(bool isPaused);
+    event RoleRevokedWithSender(bytes32 indexed role, address indexed account);
 
     // Role Constants
     function DOCTOR_ROLE() external pure returns (bytes32);
@@ -36,6 +37,8 @@ interface IMedicalAccess {
     function PHARMACIST_ROLE() external pure returns (bytes32);
 
     function ADMIN_ROLE() external pure returns (bytes32);
+
+    function PATIENT_ROLE() external view returns (bytes32);
 
     // Role Verification
     function isActive(address doctorAddress) external view returns (bool);
@@ -87,10 +90,10 @@ interface IMedicalAccess {
 
     function registerPatient() external;
 
-    function renewDoctorLicense(
-        address doctorAddress,
-        uint256 newExpiry
-    ) external;
+    // function renewDoctorLicense(
+    //     address doctorAddress,
+    //     uint256 newExpiry
+    // ) external;
 
     // System Controls
     function togglePause(uint256 durationHours) external;

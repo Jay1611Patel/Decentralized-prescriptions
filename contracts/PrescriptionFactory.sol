@@ -4,6 +4,10 @@ pragma solidity ^0.8.28;
 import "./access/MedicalAccess.sol";
 import "./prescription/PrescriptionRegistry.sol";
 import "./tokens/PrescriptionToken.sol";
+import "hardhat/console.sol";
+import "./interfaces/IMedicalAccess.sol";
+import "./interfaces/IPrescriptionRegistry.sol";
+import "./interfaces/IPrescriptionToken.sol";
 
 /**
  * @title Prescription System Factory
@@ -29,8 +33,15 @@ contract PrescriptionFactory {
         // Deploy access control first
         medicalAccess = new MedicalAccess();
 
+        // Grant factory temporary admin rights
+        medicalAccess.grantRole(medicalAccess.ADMIN_ROLE(), msg.sender);
+
         // Deploy registry with medical access reference
-        prescriptionRegistry = new PrescriptionRegistry(address(medicalAccess));
+        prescriptionRegistry = new PrescriptionRegistry(
+            address(medicalAccess),
+            address(0),
+            address(0)
+        );
 
         // Deploy the ERC-721 prescription token
         prescriptionToken = new PrescriptionToken(baseTokenURI);
@@ -45,9 +56,7 @@ contract PrescriptionFactory {
             prescriptionToken.BURNER_ROLE(),
             address(prescriptionRegistry)
         );
-
-        // 2. Make factory deployer the default admin
-        medicalAccess.grantRole(medicalAccess.ADMIN_ROLE(), msg.sender);
+        prescriptionRegistry.setPrescriptionToken(address(prescriptionToken));
 
         emit SystemDeployed(
             address(medicalAccess),

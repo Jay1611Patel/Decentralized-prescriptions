@@ -24,29 +24,23 @@ contract PrescriptionToken is ERC721, AccessControl, IPrescriptionToken {
     function mint(
         address to,
         uint256 tokenId,
-        string memory tokenURI
+        string memory tokenURI_
     ) external override onlyRole(MINTER_ROLE) {
         _mint(to, tokenId);
         _prescriptionTokens[tokenId] = true;
-        _tokenURIs[tokenId] = tokenURI;
+        _tokenURIs[tokenId] = tokenURI_;
     }
 
     function burn(uint256 tokenId) external override onlyRole(BURNER_ROLE) {
-        require(
-            ownerOf(tokenId) == msg.sender ||
-                getApproved(tokenId) == msg.sender ||
-                isApprovedForAll(ownerOf(tokenId), msg.sender),
-            "Not owner nor approved"
-        );
         _burn(tokenId);
         delete _prescriptionTokens[tokenId];
+        delete _tokenURIs[tokenId];
     }
 
     function tokenURI(
         uint256 tokenId
     ) public view override returns (string memory) {
-        require(ownerOf(tokenId) != address(0), "Nonexistent token");
-        return _tokenURIs[tokenId];
+        return string(abi.encodePacked(_baseTokenURI, _tokenURIs[tokenId]));
     }
 
     function setBaseURI(
@@ -55,7 +49,13 @@ contract PrescriptionToken is ERC721, AccessControl, IPrescriptionToken {
         _baseTokenURI = baseURI_;
     }
 
+    // Change from external to internal to match parent
     function _baseURI() internal view override returns (string memory) {
+        return _baseTokenURI;
+    }
+
+    // Add this external function if you need external access
+    function getBaseURI() external view returns (string memory) {
         return _baseTokenURI;
     }
 
