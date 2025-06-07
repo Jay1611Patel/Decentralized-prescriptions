@@ -7,6 +7,10 @@ export default defineConfig({
         open: true, // Automatically open browser
         port: 3000, // Set explicit port
     },
+    define: {
+        "process.env": {},
+        global: "window",
+    },
     resolve: {
         alias: {
             "@": "/src",
@@ -14,5 +18,12 @@ export default defineConfig({
     },
     json: {
         stringify: true,
+    },
+    optimizeDeps: {
+        esbuildOptions: {
+            define: {
+                global: "globalThis",
+            },
+        },
     },
 })

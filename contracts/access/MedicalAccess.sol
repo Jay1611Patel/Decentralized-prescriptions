@@ -20,6 +20,10 @@ contract MedicalAccess is AccessControl, IMedicalAccess {
     mapping(address => DoctorProfile) public doctorRegistry;
     mapping(address => PharmacistProfile) public pharmacistRegistry;
     mapping(address => bool) public patientRegistry;
+    mapping(address => string) private patientDataCIDs;
+    mapping(address => AccessRequest[]) private accessRequests;
+    mapping(address => mapping(address => bytes)) private accessKeys;
+    uint256 private nextRequestId;
 
     address[] public doctorList;
     address[] public pharmacistList;
@@ -144,10 +148,64 @@ contract MedicalAccess is AccessControl, IMedicalAccess {
     }
 
     function registerPatient() external override notPaused {
-        require(!patientRegistry[msg.sender], "Patient already registered");
+        require(!patientRegistry[msg.sender], "Already registered");
+
+        // Clear any existing role first
+        if (hasRole(PATIENT_ROLE, msg.sender)) {
+            _revokeRole(PATIENT_ROLE, msg.sender);
+        }
+
         _grantRole(PATIENT_ROLE, msg.sender);
         patientRegistry[msg.sender] = true;
         emit PatientRegistered(msg.sender);
+    }
+
+    function requestAccess(
+        address patient,
+        string memory doctorName,
+        string memory hospital
+    ) external override onlyRole(DOCTOR_ROLE) {
+        uint256 requestId = nextRequestId++;
+        accessRequests[patient].push(
+            AccessRequest({
+                id: requestId,
+                doctor: msg.sender,
+                patient: patient,
+                doctorName: doctorName,
+                hospital: hospital,
+                timestamp: block.timestamp,
+                fulfilled: false
+            })
+        );
+        emit AccessRequested(requestId, msg.sender, patient);
+    }
+
+    function approveAccess(
+        uint256 requestId,
+        bytes memory encryptedKey
+    ) external override {
+        AccessRequest[] storage requests = accessRequests[msg.sender];
+        for (uint i = 0; i < requests.length; i++) {
+            if (requests[i].id == requestId) {
+                requests[i].fulfilled = true;
+                accessKeys[msg.sender][requests[i].doctor] = encryptedKey;
+                emit AccessApproved(requestId, requests[i].doctor, msg.sender);
+                return;
+            }
+        }
+        revert("Request not found");
+    }
+
+    function storeDataCID(
+        string calldata cid
+    ) external override onlyRole(PATIENT_ROLE) {
+        patientDataCIDs[msg.sender] = cid;
+        emit DataStored(msg.sender, cid);
+    }
+
+    function revokeAccess(address doctor) external override {
+        delete accessKeys[msg.sender][doctor];
+        emit AccessRevoked(doctor, msg.sender);
     }
 
     // function renewDoctorLicense(
@@ -224,6 +282,24 @@ contract MedicalAccess is AccessControl, IMedicalAccess {
         address pharmacistAddress
     ) external view override returns (PharmacistProfile memory) {
         return pharmacistRegistry[pharmacistAddress];
+    }
+
+    function getPatientCID(
+        address patient
+    ) external view override returns (string memory) {
+        require(
+            msg.sender == patient ||
+                hasRole(ADMIN_ROLE, msg.sender) ||
+                hasRole(DOCTOR_ROLE, msg.sender),
+            "No access"
+        );
+        return patientDataCIDs[patient];
+    }
+
+    function getAccessRequests(
+        address patient
+    ) external view override returns (AccessRequest[] memory) {
+        return accessRequests[patient];
     }
 
     function supportsInterface(

@@ -1,21 +1,18 @@
-import { useWallet } from '../context/WalletContext';
 import { Navigate } from 'react-router-dom';
+import { useWallet } from '../context/WalletContext';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { account, role, loading } = useWallet();
 
   if (loading) {
-    return <div>Loading...</div>; // Or your custom loader
+    return <div>Loading...</div>;
   }
 
   if (!account) {
     return <Navigate to="/" replace />;
   }
 
-  // Convert allowedRoles to array if it's not already
-  const rolesArray = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
-
-  if (!rolesArray.includes(role)) {
+  if (!allowedRoles.includes(role)) {
     return <Navigate to="/" replace />;
   }
 
