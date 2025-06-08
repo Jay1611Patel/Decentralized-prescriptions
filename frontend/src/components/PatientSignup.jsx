@@ -4,19 +4,30 @@ import { useWallet } from '../context/WalletContext';
 import styled from 'styled-components';
 
 const FormContainer = styled.div`
-  max-width: 600px;
-  margin: 2rem auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #f5f7fa;
   padding: 2rem;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 `;
 
-const FormTitle = styled.h2`
+
+const FormCard = styled.div`
+  width: 100%;
+  max-width: 500px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 2.5rem;
+`;
+
+const FormTitle = styled.h1`
   font-size: 1.5rem;
   color: #2d3748;
-  margin-bottom: 1.5rem;
+  margin-bottom: 2rem;
   text-align: center;
+  font-weight: 600;
 `;
 
 const FormGroup = styled.div`
@@ -26,18 +37,17 @@ const FormGroup = styled.div`
 const Label = styled.label`
   display: block;
   margin-bottom: 0.5rem;
-  font-weight: 600;
   color: #4a5568;
+  font-weight: 500;
 `;
 
 const Input = styled.input`
   width: 100%;
   padding: 0.75rem;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: 6px;
   font-size: 1rem;
-  transition: border-color 0.2s;
-
+  
   &:focus {
     outline: none;
     border-color: #667eea;
@@ -48,11 +58,11 @@ const TextArea = styled.textarea`
   width: 100%;
   padding: 0.75rem;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: 6px;
   font-size: 1rem;
-  min-height: 100px;
-  transition: border-color 0.2s;
-
+  min-height: 120px;
+  resize: vertical;
+  
   &:focus {
     outline: none;
     border-color: #667eea;
@@ -60,15 +70,15 @@ const TextArea = styled.textarea`
 `;
 
 const SubmitButton = styled.button`
+  width: 100%;
+  padding: 0.8rem;
   background-color: #4c51bf;
   color: white;
   border: none;
-  border-radius: 8px;
-  padding: 0.8rem 1.5rem;
+  border-radius: 6px;
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  width: 100%;
   margin-top: 1rem;
   transition: background-color 0.2s;
 
@@ -192,6 +202,7 @@ const PatientSignup = () => {
 
   return (
     <FormContainer>
+      <FormCard>
       <FormTitle>Complete Your Patient Profile</FormTitle>
       {error && <ErrorMessage>{error}</ErrorMessage>}
       
@@ -248,6 +259,7 @@ const PatientSignup = () => {
           {isSubmitting ? 'Processing...' : 'Complete Registration'}
         </SubmitButton>
       </form>
+      </FormCard>
     </FormContainer>
   );
 };
