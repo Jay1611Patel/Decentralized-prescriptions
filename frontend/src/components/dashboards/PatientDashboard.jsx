@@ -1,71 +1,87 @@
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { useWallet } from '../../context/WalletContext';
+import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-
-const DashboardContainer = styled.div`
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 2rem;
-`;
-
-const Header = styled.header`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid #e2e8f0;
-`;
-
-const Title = styled.h1`
-  font-size: 1.8rem;
-  color: #2d3748;
-`;
-
-const AddressDisplay = styled.div`
-  background-color: #edf2f7;
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  font-family: monospace;
-`;
-
-const Content = styled.div`
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  padding: 2rem;
-`;
+import PatientHeader from '../patient/PatientHeader';
+import PermissionRequest from '../patient/PermissionRequest';
+import ActivePermissions from '../patient/ActivePermissions';
+import PrescriptionList from '../patient/PrescriptionList';
 
 const PatientDashboard = () => {
-  const { account, role, shouldLogout } = useWallet();
+  const { account, role, contract } = useWallet();
+  const [activeTab, setActiveTab] = useState('permissions');
+  const [showPermissionRequest, setShowPermissionRequest] = useState(false);
+  const [permissions, setPermissions] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (shouldLogout) {
-      navigate('/');
-    } else if (role !== 'patient') {
+    if (!account || role !== 'patient') {
       navigate('/');
     }
-  }, [shouldLogout, role, navigate]);
+  }, [account, role, navigate]);
 
-  if (!account) {
-    return null; // Will be redirected by useEffect
-  }
+  const loadPermissions = async () => {
+    if (!contract) return;
+    try {
+      const perms = await contract.getActivePermissions(account);
+      setPermissions(perms);
+    } catch (error) {
+      console.error("Failed to load permissions:", error);
+    }
+  };
+
+  useEffect(() => {
+    loadPermissions();
+  }, [contract, account]);
 
   return (
     <DashboardContainer>
-      <Header>
-        <Title>Patient Dashboard</Title>
-        <AddressDisplay>{account}</AddressDisplay>
-      </Header>
+      <PatientHeader 
+        onRequestAccess={() => setShowPermissionRequest(true)}
+      />
       
-      <Content>
-        <h2>Welcome to your patient portal</h2>
-        <p>Here you can view and manage your prescriptions, medical records, and doctor access.</p>
-      </Content>
+      <TabContainer>
+        <TabButton 
+          active={activeTab === 'permissions'} 
+          onClick={() => setActiveTab('permissions')}
+        >
+          Access Permissions
+        </TabButton>
+        <TabButton 
+          active={activeTab === 'prescriptions'} 
+          onClick={() => setActiveTab('prescriptions')}
+        >
+          My Prescriptions
+        </TabButton>
+      </TabContainer>
+
+      <ContentArea>
+        {activeTab === 'permissions' && (
+          <>
+            <ActivePermissions 
+              permissions={permissions} 
+              onRevoke={loadPermissions}
+              onExtend={loadPermissions}
+            />
+            <ActionButton onClick={() => setShowPermissionRequest(true)}>
+              + Grant New Access
+            </ActionButton>
+          </>
+        )}
+        
+        {activeTab === 'prescriptions' && (
+          <PrescriptionList />
+        )}
+      </ContentArea>
+
+      {showPermissionRequest && (
+        <PermissionRequest 
+          onClose={() => setShowPermissionRequest(false)}
+          onComplete={loadPermissions}
+        />
+      )}
     </DashboardContainer>
   );
-};
+}
 
-export default PatientDashboard;
+export default PermissionRequest;

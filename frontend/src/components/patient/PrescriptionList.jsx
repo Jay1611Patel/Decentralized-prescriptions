@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { useWallet } from '../context/WalletContext';
+import { useWallet } from '../../context/WalletContext';
 
 const PrescriptionContainer = styled.div`
   margin-top: 1.5rem;
