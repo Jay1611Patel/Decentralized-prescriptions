@@ -13,6 +13,8 @@ const DashboardContainer = styled.div`
   display: flex;
   min-height: 100vh;
   background-color: #f5f7fa;
+  width: 100vw; // Add this
+  margin: 0; // Add this
 `;
 
 const Sidebar = styled.div`
@@ -26,6 +28,7 @@ const MainContent = styled.div`
   flex: 1;
   padding: 20px;
   overflow-y: auto;
+  width: calc(100vw - 250px);
 `;
 
 const SidebarItem = styled.div`

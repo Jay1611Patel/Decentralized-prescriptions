@@ -2,47 +2,48 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWallet } from '../context/WalletContext';
 import styled from 'styled-components';
+import { MetaMaskIcon } from '../utils/Icons';
 
 const LoginContainer = styled.div`
   display: flex;
-  flex-direction: column;
-  align-items: center;
   justify-content: center;
+  align-items: center;
   height: 100vh;
-  background-color: #f5f5f5;
+  background-color: #f5f7fa;
 `;
 
 const Card = styled.div`
   background: white;
-  padding: 2rem;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  padding: 2.5rem;
   width: 100%;
-  max-width: 400px;
+  max-width: 450px;
   text-align: center;
 `;
 
 const Title = styled.h1`
-  color: #333;
-  margin-bottom: 2rem;
+  font-size: 1.8rem;
+  color: #2d3748;
+  margin-bottom: 1.5rem;
 `;
 
 const Button = styled.button`
   background-color: #f6851b;
   color: white;
   border: none;
-  padding: 12px 24px;
-  margin: 8px 0;
   border-radius: 8px;
-  cursor: pointer;
-  font-size: 16px;
+  padding: 0.8rem 1.5rem;
+  font-size: 1rem;
   font-weight: 600;
-  width: 100%;
-  transition: background-color 0.3s;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 1rem;
+  transition: background-color 0.2s;
 
   &:hover {
     background-color: #e2761b;
@@ -55,36 +56,40 @@ const Button = styled.button`
 `;
 
 const RegisterButton = styled(Button)`
-  background-color: #2196F3;
+  background-color: #4c51bf;
 
   &:hover {
-    background-color: #0b7dda;
+    background-color: #434190;
   }
 `;
 
 const AddressDisplay = styled.div`
-  margin: 1rem 0;
-  padding: 0.5rem;
-  background-color: rgb(67, 172, 205);
-  border-radius: 4px;
-  word-break: break-all;
+  background-color: #edf2f7;
+  padding: 0.8rem;
+  border-radius: 8px;
   font-family: monospace;
+  word-break: break-all;
+  margin: 1rem 0;
 `;
 
-const ErrorMessage = styled.div`
-  color: #ff4444;
+const ErrorMessage = styled.p`
+  color: #e53e3e;
   margin-top: 1rem;
-  padding: 0.5rem;
-  background: #ffebee;
-  border-radius: 4px;
 `;
 
-const MetaMaskIcon = styled.span`
-  display: inline-block;
-  width: 20px;
-  height: 20px;
-  background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzODQgNTEyIj48cGF0aCBmaWxsPSIjZTc2NzFCIiBkPSJNMzQxLjEgMTUzLjZjMTkuOC0yMS4yIDMxLjktNDguNCAzMS45LTc4LjVDMzczIDMzLjYgMzM5LjQgMCAzMDAuNSAwSDgzLjVDMzcuNCAwIDAgMzcuNCAwIDgzLjV2MzQ1YzAgNDYuMSAzNy40IDgzLjUgODMuNSA4My41aDIxN2M0Ni4xIDAgODMuNS0zNy40IDgzLjUtODMuNVYyNTZjMC0zMC4xLTEyLjEtNTcuMy0zMS45LTc4LjR6TTMwMC41IDUxSDI1NnY1MWg0NC41YzE3LjkgMCAzMi41IDE0LjYgMzIuNSAzMi41UzMxOC40IDE2NiAzMDAuNSAxNjZIMjU2djUxaDQ0LjVjMzEuOCAwIDU3LjUtMjUuNyA1Ny41LTU3LjVTMzMyLjMgNTEgMzAwLjUgNTF6TTEwMiAxNTNoNTF2LTUxaC0zNC41Yy0xNy45IDAtMzIuNSAxNC42LTMyLjUgMzIuNVM4NC4xIDE1MyAxMDIgMTUzem0wIDEwMmg1MXYtNTFoLTUxdjUxem0wIDUxaDUxdi01MWgtNTEgICAgdjUxem0wIDUxaDUxdi01MWgtNTEgICAgdjUxem0wIDUxaDUxdi01MWgtNTEgICAgdjUxeiIvPjwvc3ZnPg==');
-  background-size: contain;
+const Spinner = styled.div`
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  border-top: 4px solid #f6851b;
+  width: 30px;
+  height: 30px;
+  animation: spin 1s linear infinite;
+  margin: 1rem auto;
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
 `;
 
 const Login = () => {
@@ -92,6 +97,7 @@ const Login = () => {
     account,
     role, 
     loading, 
+    contract,
     isConnecting,
     error,
     connectWallet,
@@ -114,9 +120,31 @@ const Login = () => {
     }
 
     if (account && role) {
-      navigate(`/${role}-dashboard`);
+      if (role === 'patient') {
+        // Check if contract is available
+        if (!contract) {
+          console.error('Contract not initialized');
+          return;
+        }
+
+        // Check if CID is stored
+        contract.getPatientCID(account)
+          .then(cid => {
+            if (!cid || cid === '') {
+              navigate('/patient-signup');
+            } else {
+              navigate('/patient-dashboard');
+            }
+          })
+          .catch(err => {
+            console.error('Error checking patient CID:', err);
+            navigate('/patient-signup');
+          });
+      } else {
+        navigate(`/${role}-dashboard`);
+      }
     }
-  }, [account, role, loading, navigate, shouldLogout]);
+  }, [account, role, loading, navigate, shouldLogout, contract]);
 
   const handleConnect = async () => {
     try {

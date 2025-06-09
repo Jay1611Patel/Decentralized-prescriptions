@@ -23,6 +23,17 @@ interface IMedicalAccess {
         string licenseHash,
         uint256 expiry
     );
+
+    struct AccessRequest {
+        uint256 id;
+        address doctor;
+        address patient;
+        string doctorName;
+        string hospital;
+        uint256 timestamp;
+        bool fulfilled;
+    }
+
     event DoctorUpdated(address indexed doctor);
     event DoctorRevoked(address indexed doctor);
     event PharmacistRegistered(address indexed pharmacist, string pharmacyId);
@@ -30,6 +41,18 @@ interface IMedicalAccess {
     event PatientRegistered(address indexed account);
     event PauseToggled(bool isPaused);
     event RoleRevokedWithSender(bytes32 indexed role, address indexed account);
+    event DataStored(address indexed patient, string cid);
+    event AccessRequested(
+        uint256 indexed requestId,
+        address indexed doctor,
+        address indexed patient
+    );
+    event AccessApproved(
+        uint256 indexed requestId,
+        address indexed doctor,
+        address indexed patient
+    );
+    event AccessRevoked(address indexed doctor, address indexed patient);
 
     // Role Constants
     function DOCTOR_ROLE() external pure returns (bytes32);
@@ -51,6 +74,21 @@ interface IMedicalAccess {
         bytes32 role,
         address account
     ) external view returns (bool);
+
+    function requestAccess(
+        address patient,
+        string memory doctorName,
+        string memory hospital
+    ) external;
+
+    function approveAccess(
+        uint256 requestId,
+        bytes memory encryptedKey
+    ) external;
+
+    function revokeAccess(address doctor) external;
+
+    function storeDataCID(string calldata cid) external;
 
     // Getters
     function getDoctor(
@@ -97,6 +135,14 @@ interface IMedicalAccess {
 
     // System Controls
     function togglePause(uint256 durationHours) external;
+
+    function getPatientCID(
+        address patient
+    ) external view returns (string memory);
+
+    function getAccessRequests(
+        address patient
+    ) external view returns (AccessRequest[] memory);
 
     function emergencyPause() external view returns (bool);
 }
