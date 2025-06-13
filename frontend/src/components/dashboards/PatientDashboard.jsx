@@ -1,14 +1,22 @@
+// components/PatientDashboard.jsx
 import { useState, useEffect } from 'react';
-import { useWallet } from '../../context/WalletContext';
 import { useNavigate } from 'react-router-dom';
-import styled from 'styled-components';
+import { useWallet } from '../../context/WalletContext';
+import {
+  DashboardContainer,
+  TabContainer,
+  TabButton,
+  ContentArea,
+  ActionButton
+} from '../styles/PatientDashboardStyles';
 import PatientHeader from '../patient/PatientHeader';
 import PermissionRequest from '../patient/PermissionRequest';
 import ActivePermissions from '../patient/ActivePermissions';
 import PrescriptionList from '../patient/PrescriptionList';
+import PatientProfileTab from '../patient/PatientProfileTab';
 
 const PatientDashboard = () => {
-  const { account, role, contract } = useWallet();
+  const { account, role, contract, getPatientCID } = useWallet();
   const [activeTab, setActiveTab] = useState('permissions');
   const [showPermissionRequest, setShowPermissionRequest] = useState(false);
   const [permissions, setPermissions] = useState([]);
@@ -53,6 +61,12 @@ const PatientDashboard = () => {
         >
           My Prescriptions
         </TabButton>
+        <TabButton 
+          active={activeTab === 'profile'} 
+          onClick={() => setActiveTab('profile')}
+        >
+          My Profile
+        </TabButton>
       </TabContainer>
 
       <ContentArea>
@@ -72,6 +86,7 @@ const PatientDashboard = () => {
         {activeTab === 'prescriptions' && (
           <PrescriptionList />
         )}
+        {activeTab === 'profile' && <PatientProfileTab />}
       </ContentArea>
 
       {showPermissionRequest && (
@@ -82,6 +97,6 @@ const PatientDashboard = () => {
       )}
     </DashboardContainer>
   );
-}
+};
 
-export default PermissionRequest;
+export default PatientDashboard;

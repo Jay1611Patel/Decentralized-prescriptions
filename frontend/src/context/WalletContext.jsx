@@ -29,40 +29,101 @@ export const WalletProvider = ({ children }) => {
     }
   }, [contract]);
 
+  // In WalletContext.js
   const storePatientData = useCallback(async (data) => {
     if (!account || !contract) {
       throw new Error("Wallet not connected");
     }
 
     try {
-      // Upload to IPFS
-      const response = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_PINATA_JWT}`
-        },
-        body: JSON.stringify({
-          pinataContent: data,
-          pinataMetadata: {
-            name: `patient-data-${account}`
+      // First try Pinata cloud
+      let cid;
+      try {
+        const pinataResponse = await fetch(
+          'https://api.pinata.cloud/pinning/pinJSONToIPFS',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${import.meta.env.VITE_PINATA_JWT}`
+            },
+            body: JSON.stringify({
+              pinataContent: data,
+              pinataMetadata: {
+                name: `patient-data-${account}-${Date.now()}`
+              }
+            })
           }
-        })
-      });
+        );
 
-      if (!response.ok) throw new Error('IPFS upload failed');
-      const { IpfsHash: cid } = await response.json();
+        if (!pinataResponse.ok) {
+          const errorData = await pinataResponse.json();
+          throw new Error(errorData.error?.details || 'IPFS upload failed');
+        }
+
+        const result = await pinataResponse.json();
+        cid = result.IpfsHash;
+      } catch (pinataError) {
+        console.warn('Pinata upload failed, trying local IPFS node:', pinataError);
+        
+        // Fallback to local IPFS node or alternative service
+        const localResponse = await fetch('http://localhost:5001/api/v0/add', {
+          method: 'POST',
+          body: JSON.stringify(data),
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (!localResponse.ok) throw new Error('Local IPFS upload failed');
+        const localResult = await localResponse.json();
+        cid = localResult.Hash;
+      }
 
       // Store CID on blockchain
-      const tx = await contract.storeDataCID(cid);
-      await tx.wait(); // Wait for transaction to be mined
+      const tx = await contract.storeDataCID(cid, { gasLimit: 500000 });
+      const receipt = await tx.wait();
+      
+      // Verify the CID was stored correctly
+      const storedCID = await contract.getPatientCID(account);
+      if (storedCID !== cid) {
+        throw new Error('CID verification failed');
+      }
 
-      return true;
+      return cid;
     } catch (error) {
-      console.error('Data storage failed:', error);
-      throw new Error('Failed to store patient data');
+      console.error('Data storage failed:', {
+        error: error.message,
+        stack: error.stack,
+        account,
+        data
+      });
+      throw new Error(`Failed to store data: ${error.message}`);
     }
   }, [account, contract]);
+
+  const getPatientData = useCallback(async (cid) => {
+    if (!cid) return null;
+
+    const gateways = [
+      `https://ipfs.io/ipfs/${cid}`,
+      `https://${cid}.ipfs.dweb.link`,
+      `https://cloudflare-ipfs.com/ipfs/${cid}`,
+      `https://gateway.pinata.cloud/ipfs/${cid}`
+    ];
+
+    for (const gateway of gateways) {
+      try {
+        const response = await fetch(gateway, {
+          signal: AbortSignal.timeout(5000) // 5 second timeout
+        });
+        if (response.ok) {
+          return await response.json();
+        }
+      } catch (e) {
+        console.warn(`Failed with gateway ${gateway}:`, e);
+      }
+    }
+    throw new Error('All IPFS gateways failed');
+  }, []);
 
   const initContract = useCallback(async (provider) => {
     if (!contractAddress) {
@@ -113,6 +174,19 @@ export const WalletProvider = ({ children }) => {
       } catch (err) {
         console.error("Registration check failed:", err);
         return false;
+      }
+    }, [contract]);
+
+    const getPatientCID = useCallback(async (patientAddress) => {
+      if (!contract) {
+        throw new Error("Contract not connected");
+      }
+      
+      try {
+        return await contract.getPatientCID(patientAddress);
+      } catch (error) {
+        console.error('Failed to fetch patient CID:', error);
+        throw error;
       }
     }, [contract]);
 
@@ -226,6 +300,112 @@ export const WalletProvider = ({ children }) => {
     return new Error('Registration failed. Please try again.');
   };
 
+  const grantTemporaryAccess = useCallback(async (doctorAddress, dataFields, duration) => {
+    if (!contract || !account) {
+      throw new Error("Wallet not connected");
+    }
+    if (duration === 0) {
+      duration = 3155760000
+    }
+    try {
+      const tx = await contract.grantTemporaryAccess(
+        doctorAddress,
+        dataFields,
+        duration,
+        { gasLimit: 500000 }
+      );
+      await tx.wait();
+      return tx.hash;
+    } catch (error) {
+      console.error('Access grant error:', error);
+      throw error;
+    }
+  }, [contract, account]);
+
+  const extendAccess = useCallback(async (requestId, additionalDuration) => {
+    if (!contract || !account) {
+      throw new Error("Wallet not connected");
+    }
+
+    try {
+      const tx = await contract.extendAccess(
+        requestId,
+        additionalDuration,
+        { gasLimit: 500000 }
+      );
+      await tx.wait();
+      return tx.hash;
+    } catch (error) {
+      console.error('Access extension error:', error);
+      throw error;
+    }
+  }, [contract, account]);
+
+  const revokeAccessEarly = useCallback(async (requestId) => {
+    if (!contract || !account) {
+      throw new Error("Wallet not connected");
+    }
+
+    try {
+      const tx = await contract.revokeAccessEarly(
+        requestId,
+        { gasLimit: 500000 }
+      ); 
+      await tx.wait();
+      return tx.hash;
+    } catch (error) {
+      console.error('Access revocation error:', error);
+      throw error;
+    }
+  }, [contract, account]);
+
+  const getActivePermissions = useCallback(async () => {
+    if (!contract || !account) {
+      throw new Error("Wallet not connected");
+    }
+
+    try {
+      // Get raw permissions from contract
+      const rawPermissions = await contract.getActivePermissions(account);
+      
+      // Get doctor details in parallel
+      const permissionsWithDetails = await Promise.all(
+        rawPermissions.map(async perm => {
+          try {
+            // Fetch doctor details
+            console.log(perm);
+            const doctorProfile = await contract.getDoctor(perm.doctor);
+            
+            return {
+              requestId: perm.requestId.toString(),
+              doctor: perm.doctor,
+              patient: perm.patient,
+              expiryTime: Number(perm.expiryTime),
+              dataFields: perm.dataFields,
+              isActive: perm.isActive,
+              doctorName: doctorProfile.name || 'Unknown Doctor',
+              doctorSpecialization: doctorProfile.specialization || '',
+              hospital: perm.hospital || ''
+            };
+          } catch (err) {
+            console.error(`Failed to fetch doctor ${perm.doctor}:`, err);
+            return {
+              ...perm,
+              doctorName: 'Unknown Doctor',
+              doctorSpecialization: '',
+              hospital: ''
+            };
+          }
+        })
+      );
+
+      return permissionsWithDetails;
+    } catch (error) {
+      console.error('Permission fetch error:', error);
+      throw error;
+    }
+  }, [contract, account]);
+
   useEffect(() => {
     if (!window.ethereum) {
       setLoading(false);
@@ -276,7 +456,13 @@ export const WalletProvider = ({ children }) => {
     checkPatientProfileComplete,
     parseRegistrationError,
     storePatientData,
-    hasRole
+    getPatientCID,
+    hasRole,
+    grantTemporaryAccess,
+    extendAccess,
+    revokeAccessEarly,
+    getActivePermissions,
+    getPatientData
   };
 
   return (
