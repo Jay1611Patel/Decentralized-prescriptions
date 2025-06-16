@@ -18,7 +18,6 @@ interface IPrescriptionRegistry {
         address indexed doctor,
         address indexed patient
     );
-
     event PrescriptionFulfilled(
         uint256 indexed prescriptionId,
         address indexed pharmacist
@@ -34,15 +33,15 @@ interface IPrescriptionRegistry {
 
     function getPrescription(
         uint256 prescriptionId
-    ) external returns (Prescription memory);
+    ) external view returns (Prescription memory);
 
     function getPatientPrescriptions(
         address patient
-    ) external returns (uint256[] memory);
+    ) external view returns (uint256[] memory);
 
     function getDoctorPrescriptions(
         address doctor
-    ) external returns (uint256[] memory);
+    ) external view returns (uint256[] memory);
 
-    function getPrescriptionCount() external returns (uint256);
+    function getPrescriptionCount() external view returns (uint256);
 }

@@ -2,6 +2,15 @@
 pragma solidity ^0.8.28;
 
 interface IMedicalAccess {
+    struct AccessPermission {
+        uint256 requestId;
+        address doctor;
+        address patient;
+        uint256 expiryTime;
+        string[] dataFields; // e.g., ["name", "dob", "allergies"]
+        bool isActive;
+    }
+
     // Struct Definitions
     struct DoctorProfile {
         string licenseHash;
@@ -53,6 +62,15 @@ interface IMedicalAccess {
         address indexed patient
     );
     event AccessRevoked(address indexed doctor, address indexed patient);
+    event TemporaryAccessGranted(
+        uint256 indexed requestId,
+        address indexed doctor,
+        address indexed patient,
+        uint256 expiryTime,
+        string[] dataFields
+    );
+    event AccessExtended(uint256 indexed requestId, uint256 newExpiry);
+    event AccessRevokedEarly(uint256 indexed requestId);
 
     // Role Constants
     function DOCTOR_ROLE() external pure returns (bytes32);
@@ -90,6 +108,19 @@ interface IMedicalAccess {
 
     function storeDataCID(string calldata cid) external;
 
+    function grantTemporaryAccess(
+        address doctor,
+        string[] calldata dataFields,
+        uint256 duration
+    ) external;
+
+    function extendAccess(
+        uint256 requestId,
+        uint256 additionalDuration
+    ) external;
+
+    function revokeAccessEarly(uint256 requestId) external;
+
     // Getters
     function getDoctor(
         address doctorAddress
@@ -106,6 +137,10 @@ interface IMedicalAccess {
     function getDoctorCount() external view returns (uint256);
 
     function getPharmacistCount() external view returns (uint256);
+
+    function getActivePermissions(
+        address patient
+    ) external view returns (AccessPermission[] memory);
 
     // Registration Functions
     function registerDoctor(

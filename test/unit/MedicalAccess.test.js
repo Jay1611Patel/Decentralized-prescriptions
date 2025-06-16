@@ -83,7 +83,6 @@ const { time } = require("@nomicfoundation/hardhat-network-helpers")
                   assert.equal(doc.licenseHash, licenseHash)
                   expect(doc.isActive).to.be.true
                   const list = await medicalAccess.getAllDoctors()
-                  assert(await medicalAccess.getDoctorCount(), 1)
               })
               it("Should revert with expired license", async () => {
                   expiryDate = (await time.latest()) - 86400

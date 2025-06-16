@@ -1,38 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-// Uncomment this line to use console.log
-// import "hardhat/console.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "../interfaces/IMedicalAccess.sol";
 import "../interfaces/IPrescriptionRegistry.sol";
 import "../interfaces/IPrescriptionToken.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
-import "hardhat/console.sol";
 
 contract PrescriptionRegistry is AccessControl, IPrescriptionRegistry {
     IMedicalAccess public medicalAccess;
     IPrescriptionToken public prescriptionToken;
 
     uint256 public prescriptionCount;
-    mapping(uint256 => Prescription) _prescriptions;
-    mapping(address => uint256[]) _patientPrescriptions;
+    mapping(uint256 => Prescription) private _prescriptions;
+    mapping(address => uint256[]) private _patientPrescriptions;
     mapping(address => uint256[]) private _doctorPrescriptions;
 
-    bytes32 public constant PHARMACIST_ROLE = keccak256("PHARMACIST_ROLE");
-    bytes32 public constant DOCTOR_ROLE = keccak256("DOCTOR_ROLE");
-
-    constructor(
-        address _medicalAccess,
-        address doctorAddress,
-        address pharmacistAddress
-    ) {
+    constructor(address _medicalAccess) {
         medicalAccess = IMedicalAccess(_medicalAccess);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(DOCTOR_ROLE, doctorAddress);
-        _grantRole(PHARMACIST_ROLE, pharmacistAddress);
-        _setRoleAdmin(DOCTOR_ROLE, DEFAULT_ADMIN_ROLE);
-        _setRoleAdmin(PHARMACIST_ROLE, DEFAULT_ADMIN_ROLE);
     }
 
     function setPrescriptionToken(
@@ -45,28 +30,16 @@ contract PrescriptionRegistry is AccessControl, IPrescriptionRegistry {
         address patient,
         uint256 expiryDate,
         string calldata prescriptionHash
-    ) external override onlyRole(DOCTOR_ROLE) {
-        require(
-            medicalAccess.isActive(msg.sender),
-            "Only active doctors can create prescription"
-        );
-        require(
-            expiryDate > block.timestamp,
-            "Expiry date should be in future"
-        );
+    ) external override {
+        require(medicalAccess.isActive(msg.sender), "Unauthorized");
+        require(expiryDate > block.timestamp, "Invalid expiry");
         require(
             medicalAccess.hasRole(medicalAccess.PATIENT_ROLE(), patient),
-            "Patient not registered"
+            "Invalid patient"
         );
-        require(patient != address(0), "Invalid Patient Address");
-        require(
-            bytes(prescriptionHash).length > 0,
-            "Invalid Prescription Hash"
-        );
-        prescriptionCount++;
-        uint256 newPrescriptionId = prescriptionCount;
 
-        _prescriptions[newPrescriptionId] = Prescription({
+        uint256 newId = ++prescriptionCount;
+        _prescriptions[newId] = Prescription({
             doctor: msg.sender,
             patient: patient,
             issueDate: block.timestamp,
@@ -77,40 +50,21 @@ contract PrescriptionRegistry is AccessControl, IPrescriptionRegistry {
             fulfillmentDate: 0
         });
 
-        _patientPrescriptions[patient].push(newPrescriptionId);
-        _doctorPrescriptions[msg.sender].push(newPrescriptionId);
+        _patientPrescriptions[patient].push(newId);
+        _doctorPrescriptions[msg.sender].push(newId);
 
         if (address(prescriptionToken) != address(0)) {
-            string memory tokenURI = string(
-                abi.encodePacked(
-                    "prescription:",
-                    Strings.toString(newPrescriptionId),
-                    ",doctor:",
-                    Strings.toHexString(uint160(msg.sender), 20),
-                    ",patient:",
-                    Strings.toHexString(uint160(patient), 20)
-                )
-            );
-            prescriptionToken.mint(patient, newPrescriptionId, tokenURI);
+            prescriptionToken.mint(patient, newId, prescriptionHash);
         }
-        emit PrescriptionCreated(newPrescriptionId, msg.sender, patient);
+
+        emit PrescriptionCreated(newId, msg.sender, patient);
     }
 
     function fulfillPrescription(uint256 prescriptionId) external override {
-        require(
-            medicalAccess.isVerifiedPharmacist(msg.sender),
-            "Not a verified Pharmacist"
-        );
+        require(medicalAccess.isVerifiedPharmacist(msg.sender), "Unauthorized");
         Prescription storage prescription = _prescriptions[prescriptionId];
-        require(
-            prescription.doctor != address(0),
-            "Prescription does not exist"
-        );
-        require(
-            prescription.patient != address(0),
-            "Prescription doesn't exist"
-        );
-        require(!prescription.isFulfilled, "Prescription is fulfilled");
+        require(prescription.doctor != address(0), "Invalid prescription");
+        require(!prescription.isFulfilled, "Already fulfilled");
         require(
             prescription.expiryDate > block.timestamp,
             "Prescription expired"
@@ -123,6 +77,7 @@ contract PrescriptionRegistry is AccessControl, IPrescriptionRegistry {
         if (address(prescriptionToken) != address(0)) {
             prescriptionToken.burn(prescriptionId);
         }
+
         emit PrescriptionFulfilled(prescriptionId, msg.sender);
     }
 
