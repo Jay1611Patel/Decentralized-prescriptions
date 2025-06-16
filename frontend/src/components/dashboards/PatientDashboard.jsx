@@ -16,7 +16,7 @@ import PrescriptionList from '../patient/PrescriptionList';
 import PatientProfileTab from '../patient/PatientProfileTab';
 
 const PatientDashboard = () => {
-  const { account, role, contract, getPatientCID } = useWallet();
+  const { account, role, contract, contracts, getPatientCID } = useWallet();
   const [activeTab, setActiveTab] = useState('permissions');
   const [showPermissionRequest, setShowPermissionRequest] = useState(false);
   const [permissions, setPermissions] = useState([]);
@@ -29,9 +29,9 @@ const PatientDashboard = () => {
   }, [account, role, navigate]);
 
   const loadPermissions = async () => {
-    if (!contract) return;
+    if (!contracts.medicalAccess) return;
     try {
-      const perms = await contract.getActivePermissions(account);
+      const perms = await contracts.medicalAccess.getPatientPermissions();
       setPermissions(perms);
     } catch (error) {
       console.error("Failed to load permissions:", error);
@@ -40,7 +40,7 @@ const PatientDashboard = () => {
 
   useEffect(() => {
     loadPermissions();
-  }, [contract, account]);
+  }, [contracts.medicalAccess, account]);
 
   return (
     <DashboardContainer>

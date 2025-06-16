@@ -154,14 +154,23 @@ contract MedicalAccess is AccessControl, IMedicalAccess {
 
     function extendAccess(
         uint256 requestId,
+        address doctor,
         uint256 additionalDuration
     ) external override {
-        permissions.extendAccess(msg.sender, requestId, additionalDuration);
+        permissions.extendAccess(
+            doctor,
+            msg.sender,
+            requestId,
+            additionalDuration
+        );
         emit AccessExtended(requestId, block.timestamp + additionalDuration);
     }
 
-    function revokeAccessEarly(uint256 requestId) external override {
-        permissions.revokeAccessEarly(msg.sender, requestId);
+    function revokeAccessEarly(
+        uint256 requestId,
+        address doctor
+    ) external override {
+        permissions.revokeAccessEarly(doctor, msg.sender, requestId);
         emit AccessRevokedEarly(requestId);
     }
 
@@ -286,10 +295,24 @@ contract MedicalAccess is AccessControl, IMedicalAccess {
         return pharmacists.getPharmacistCount();
     }
 
-    function getActivePermissions(
-        address patient
-    ) external view override returns (AccessPermission[] memory) {
-        return permissions.getActivePermissions(patient);
+    function getDoctorAccess()
+        external
+        view
+        override
+        returns (AccessPermission[] memory)
+    {
+        require(hasRole(DOCTOR_ROLE, msg.sender), "Caller is not a doctor");
+        return permissions.getDoctorAccess(msg.sender);
+    }
+
+    function getPatientPermissions()
+        external
+        view
+        override
+        returns (AccessPermission[] memory)
+    {
+        require(hasRole(PATIENT_ROLE, msg.sender), "Caller is not a patient");
+        return permissions.getPatientPermissions(msg.sender);
     }
 
     function getPatientCID(
