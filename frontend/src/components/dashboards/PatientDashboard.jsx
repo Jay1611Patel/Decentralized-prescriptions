@@ -84,7 +84,8 @@ const PatientDashboard = () => {
         )}
         
         {activeTab === 'prescriptions' && (
-          <PrescriptionList />
+          <PrescriptionList 
+          patientAddress={account}/>
         )}
         {activeTab === 'profile' && <PatientProfileTab />}
       </ContentArea>

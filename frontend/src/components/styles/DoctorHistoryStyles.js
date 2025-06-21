@@ -29,6 +29,7 @@ export const Select = styled.select`
     border-radius: 4px;
     font-size: 14px;
     background: white;
+    color: black;
 
     &:focus {
         outline: none;

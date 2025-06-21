@@ -75,22 +75,20 @@ const PrescriptionList = ({ patientAddress }) => {
   const [prescriptions, setPrescriptions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const { contract } = useWallet();
+  const { contracts } = useWallet();
 
   useEffect(() => {
     const fetchPrescriptions = async () => {
-      if (!contract || !patientAddress) return;
+      if (!contracts.prescriptionRegistry || !patientAddress) return;
 
       setIsLoading(true);
       setError(null);
 
       try {
-        // In a real implementation, you would call the contract to get prescriptions
-        // For example:
-        // const prescriptionIds = await contract.getPatientPrescriptions(patientAddress);
-        // const fetchedPrescriptions = await Promise.all(
-        //   prescriptionIds.map(id => contract.getPrescription(id))
-        // );
+        const prescriptionIds = await contracts.prescriptionRegistry.getPatientPrescriptions(patientAddress);
+        const fetchedPrescriptions = await Promise.all(
+           prescriptionIds.map(id => contracts.prescriptionRegistry.getPrescription(id))
+        );
 
         // Mock data for demonstration
         const mockPrescriptions = [
@@ -122,7 +120,7 @@ const PrescriptionList = ({ patientAddress }) => {
           }
         ];
 
-        setPrescriptions(mockPrescriptions);
+        setPrescriptions(fetchedPrescriptions);
       } catch (err) {
         console.error('Failed to fetch prescriptions:', err);
         setError('Failed to load prescriptions. Please try again.');
@@ -132,11 +130,13 @@ const PrescriptionList = ({ patientAddress }) => {
     };
 
     fetchPrescriptions();
-  }, [contract, patientAddress]);
+  }, [contracts.prescriptionRegistry, patientAddress]);
 
   const getStatus = (prescription) => {
     const now = new Date();
-    const expiryDate = new Date(prescription.expiryDate);
+    const expiryDate = new Date(Number(prescription.expiryDate));
+    console.log(`Now: ${now}`);
+    console.log(`Expiry: ${expiryDate}`);
     
     if (prescription.isFulfilled) return 'fulfilled';
     if (now > expiryDate) return 'expired';

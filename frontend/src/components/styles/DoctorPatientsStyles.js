@@ -66,6 +66,7 @@ export const AccessInfo = styled.div`
 
 export const DataFields = styled.div`
     margin-bottom: 10px;
+    color: #7f8c8d;
 `
 
 export const SearchBar = styled.input`
