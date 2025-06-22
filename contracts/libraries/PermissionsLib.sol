@@ -6,6 +6,7 @@ import "../interfaces/IMedicalAccess.sol";
 library PermissionsLib {
     struct AccessPermissionStorage {
         mapping(address => IMedicalAccess.AccessPermission[]) patientPermissions;
+        mapping(address => IMedicalAccess.AccessPermission[]) doctorPermissions;
         uint256 nextRequestId;
     }
 
@@ -19,54 +20,127 @@ library PermissionsLib {
         requestId = self.nextRequestId++;
         uint256 expiryTime = block.timestamp + duration;
 
-        self.patientPermissions[patient].push(
-            IMedicalAccess.AccessPermission({
+        IMedicalAccess.AccessPermission memory permission = IMedicalAccess
+            .AccessPermission({
                 requestId: requestId,
                 doctor: doctor,
                 patient: patient,
                 expiryTime: expiryTime,
                 dataFields: dataFields,
                 isActive: true
-            })
-        );
+            });
+        self.doctorPermissions[doctor].push(permission);
+        self.patientPermissions[patient].push(permission);
     }
 
     function extendAccess(
         AccessPermissionStorage storage self,
+        address doctor,
         address patient,
         uint256 requestId,
         uint256 additionalDuration
     ) external {
-        IMedicalAccess.AccessPermission[] storage permissions = self
-            .patientPermissions[patient];
-        for (uint i = 0; i < permissions.length; i++) {
-            if (permissions[i].requestId == requestId) {
-                require(permissions[i].isActive, "Permission not active");
-                permissions[i].expiryTime += additionalDuration;
-                return;
+        bool found;
+        IMedicalAccess.AccessPermission[] storage doctorPerms = self
+            .doctorPermissions[doctor];
+        for (uint i = 0; i < doctorPerms.length; i++) {
+            if (
+                doctorPerms[i].requestId == requestId &&
+                doctorPerms[i].patient == patient
+            ) {
+                require(doctorPerms[i].isActive, "Permission not active");
+                doctorPerms[i].expiryTime += additionalDuration;
+                found = true;
+                break;
             }
         }
-        revert("Permission not found");
+
+        IMedicalAccess.AccessPermission[] storage patientPerms = self
+            .patientPermissions[patient];
+        for (uint i = 0; i < patientPerms.length; i++) {
+            if (
+                patientPerms[i].requestId == requestId &&
+                patientPerms[i].doctor == doctor
+            ) {
+                require(patientPerms[i].isActive, "Permission not active");
+                patientPerms[i].expiryTime += additionalDuration;
+                break;
+            }
+        }
+
+        if (!found) revert("Permission not found");
     }
 
     function revokeAccessEarly(
         AccessPermissionStorage storage self,
+        address doctor,
         address patient,
         uint256 requestId
     ) external {
-        IMedicalAccess.AccessPermission[] storage permissions = self
-            .patientPermissions[patient];
-        for (uint i = 0; i < permissions.length; i++) {
-            if (permissions[i].requestId == requestId) {
-                require(permissions[i].isActive, "Permission not active");
-                permissions[i].isActive = false;
-                return;
+        bool found;
+
+        // Doctor's permissions
+        IMedicalAccess.AccessPermission[] storage doctorPerms = self
+            .doctorPermissions[doctor];
+        for (uint i = 0; i < doctorPerms.length; i++) {
+            if (
+                doctorPerms[i].requestId == requestId &&
+                doctorPerms[i].patient == patient
+            ) {
+                require(doctorPerms[i].isActive, "Permission not active");
+                doctorPerms[i].isActive = false;
+                found = true;
+                break;
             }
         }
-        revert("Permission not found");
+
+        // Patient's permissions
+        IMedicalAccess.AccessPermission[] storage patientPerms = self
+            .patientPermissions[patient];
+        for (uint i = 0; i < patientPerms.length; i++) {
+            if (
+                patientPerms[i].requestId == requestId &&
+                patientPerms[i].doctor == doctor
+            ) {
+                require(patientPerms[i].isActive, "Permission not active");
+                patientPerms[i].isActive = false;
+                break;
+            }
+        }
+
+        if (!found) revert("Permission not found");
     }
 
-    function getActivePermissions(
+    function getDoctorAccess(
+        AccessPermissionStorage storage self,
+        address doctor
+    ) external view returns (IMedicalAccess.AccessPermission[] memory) {
+        IMedicalAccess.AccessPermission[] storage all = self.doctorPermissions[
+            doctor
+        ];
+        uint256 activeCount = 0;
+
+        for (uint i = 0; i < all.length; i++) {
+            if (all[i].isActive && all[i].expiryTime > block.timestamp) {
+                activeCount++;
+            }
+        }
+
+        IMedicalAccess.AccessPermission[]
+            memory result = new IMedicalAccess.AccessPermission[](activeCount);
+        uint256 index = 0;
+
+        for (uint i = 0; i < all.length; i++) {
+            if (all[i].isActive && all[i].expiryTime > block.timestamp) {
+                result[index] = all[i];
+                index++;
+            }
+        }
+
+        return result;
+    }
+
+    function getPatientPermissions(
         AccessPermissionStorage storage self,
         address patient
     ) external view returns (IMedicalAccess.AccessPermission[] memory) {

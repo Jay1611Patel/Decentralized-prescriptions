@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "../interfaces/IMedicalAccess.sol";
 import "../interfaces/IPrescriptionRegistry.sol";
 import "../interfaces/IPrescriptionToken.sol";
+import "hardhat/console.sol";
 
 contract PrescriptionRegistry is AccessControl, IPrescriptionRegistry {
     IMedicalAccess public medicalAccess;
@@ -37,6 +38,7 @@ contract PrescriptionRegistry is AccessControl, IPrescriptionRegistry {
             medicalAccess.hasRole(medicalAccess.PATIENT_ROLE(), patient),
             "Invalid patient"
         );
+        console.log("-----------------");
 
         uint256 newId = ++prescriptionCount;
         _prescriptions[newId] = Prescription({

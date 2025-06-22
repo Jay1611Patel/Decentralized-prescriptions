@@ -375,6 +375,11 @@
         "type": "uint256"
       },
       {
+        "internalType": "address",
+        "name": "doctor",
+        "type": "address"
+      },
+      {
         "internalType": "uint256",
         "name": "additionalDuration",
         "type": "uint256"
@@ -434,57 +439,6 @@
           }
         ],
         "internalType": "struct IMedicalAccess.AccessRequest[]",
-        "name": "",
-        "type": "tuple[]"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "patient",
-        "type": "address"
-      }
-    ],
-    "name": "getActivePermissions",
-    "outputs": [
-      {
-        "components": [
-          {
-            "internalType": "uint256",
-            "name": "requestId",
-            "type": "uint256"
-          },
-          {
-            "internalType": "address",
-            "name": "doctor",
-            "type": "address"
-          },
-          {
-            "internalType": "address",
-            "name": "patient",
-            "type": "address"
-          },
-          {
-            "internalType": "uint256",
-            "name": "expiryTime",
-            "type": "uint256"
-          },
-          {
-            "internalType": "string[]",
-            "name": "dataFields",
-            "type": "string[]"
-          },
-          {
-            "internalType": "bool",
-            "name": "isActive",
-            "type": "bool"
-          }
-        ],
-        "internalType": "struct IMedicalAccess.AccessPermission[]",
         "name": "",
         "type": "tuple[]"
       }
@@ -566,6 +520,51 @@
   },
   {
     "inputs": [],
+    "name": "getDoctorAccess",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "requestId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "doctor",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "patient",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "expiryTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "string[]",
+            "name": "dataFields",
+            "type": "string[]"
+          },
+          {
+            "internalType": "bool",
+            "name": "isActive",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct IMedicalAccess.AccessPermission[]",
+        "name": "",
+        "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "getDoctorCount",
     "outputs": [
       {
@@ -591,6 +590,51 @@
         "internalType": "string",
         "name": "",
         "type": "string"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getPatientPermissions",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "requestId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "doctor",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "patient",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "expiryTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "string[]",
+            "name": "dataFields",
+            "type": "string[]"
+          },
+          {
+            "internalType": "bool",
+            "name": "isActive",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct IMedicalAccess.AccessPermission[]",
+        "name": "",
+        "type": "tuple[]"
       }
     ],
     "stateMutability": "view",
@@ -835,6 +879,11 @@
         "internalType": "uint256",
         "name": "requestId",
         "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "doctor",
+        "type": "address"
       }
     ],
     "name": "revokeAccessEarly",

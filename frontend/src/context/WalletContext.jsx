@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import { ethers } from 'ethers';
 import { useNavigate } from 'react-router-dom';
 import MedicalAccessABI from '../abi/MedicalAccess.json';
+import PrescriptionRegistryABI from '../abi/PrescriptionRegistry.json';
+import PrescriptionTokenABI from '../abi/PrescriptionToken.json';
 
 const WalletContext = createContext();
 
@@ -15,23 +17,30 @@ export const WalletProvider = ({ children }) => {
   const [shouldLogout, setShouldLogout] = useState(false);
   const [isDisconnected, setIsDisconnected] = useState(false);
   const navigate = useNavigate();
+  const [contracts, setContracts] = useState({
+    medicalAccess: null,
+    prescriptionRegistry: null,
+    prescriptionToken: null
+  });
 
-  const contractAddress = import.meta.env.VITE_APP_MEDICAL_ACCESS_ADDRESS;
+  const medicalAccessAddress = import.meta.env.VITE_APP_MEDICAL_ACCESS_ADDRESS;
+  const prescriptionRegistryAddress = import.meta.env.VITE_APP_PRESCRIPTION_REGISTRY_ADDRESS;
+  const prescriptionTokenAddress = import.meta.env.VITE_APP_PRESCRIPTION_TOKEN_ADDRESS;
 
   const hasRole = useCallback(async (roleName, address) => {
-    if (!contract || !address) return false;
+    if (!contracts.medicalAccess || !address) return false;
     try {
-      const role = await contract[roleName]();
-      return await contract.hasRole(role, address);
+      const role = await contracts.medicalAccess[roleName]();
+      return await contracts.medicalAccess.hasRole(role, address);
     } catch (err) {
       console.error(`Role check failed for ${roleName}:`, err);
       return false;
     }
-  }, [contract]);
+  }, [contracts.medicalAccess]);
 
   // In WalletContext.js
   const storePatientData = useCallback(async (data) => {
-    if (!account || !contract) {
+    if (!account || !contracts.medicalAccess) {
       throw new Error("Wallet not connected");
     }
 
@@ -79,11 +88,11 @@ export const WalletProvider = ({ children }) => {
       }
 
       // Store CID on blockchain
-      const tx = await contract.storeDataCID(cid, { gasLimit: 500000 });
+      const tx = await contracts.medicalAccess.storeDataCID(cid, { gasLimit: 500000 });
       const receipt = await tx.wait();
       
       // Verify the CID was stored correctly
-      const storedCID = await contract.getPatientCID(account);
+      const storedCID = await contracts.medicalAccess.getPatientCID(account);
       if (storedCID !== cid) {
         throw new Error('CID verification failed');
       }
@@ -98,7 +107,7 @@ export const WalletProvider = ({ children }) => {
       });
       throw new Error(`Failed to store data: ${error.message}`);
     }
-  }, [account, contract]);
+  }, [account, contracts.medicalAccess]);
 
   const getPatientData = useCallback(async (cid) => {
     if (!cid) return null;
@@ -125,35 +134,53 @@ export const WalletProvider = ({ children }) => {
     throw new Error('All IPFS gateways failed');
   }, []);
 
-  const initContract = useCallback(async (provider) => {
-    if (!contractAddress) {
-      throw new Error("Contract address not configured");
-    }
-
+  const initContracts = useCallback(async (provider) => {
     try {
       const signer = await provider.getSigner();
-      const contract = new ethers.Contract(
-        contractAddress,
+      
+      const medicalAccess = new ethers.Contract(
+        import.meta.env.VITE_APP_MEDICAL_ACCESS_ADDRESS,
         MedicalAccessABI.abi,
         signer
       );
-      setContract(contract);
-      return contract;
+
+      const prescriptionRegistry = new ethers.Contract(
+        import.meta.env.VITE_APP_PRESCRIPTION_REGISTRY_ADDRESS,
+        PrescriptionRegistryABI.abi,
+        signer
+      );
+
+      const prescriptionToken = new ethers.Contract(
+        import.meta.env.VITE_APP_PRESCRIPTION_TOKEN_ADDRESS,
+        PrescriptionTokenABI.abi,
+        signer
+      );
+
+      setContracts({
+        medicalAccess,
+        prescriptionRegistry,
+        prescriptionToken
+      });
+
+      // Set default contract for backward compatibility
+      setContract(medicalAccess);
+
+      return { medicalAccess, prescriptionRegistry, prescriptionToken };
     } catch (err) {
       console.error("Contract initialization failed:", err);
-      throw new Error("Failed to initialize contract");
+      throw new Error("Failed to initialize contracts");
     }
-  }, [contractAddress]);
+  }, []);
 
-  const checkUserRole = useCallback(async (contract, address) => {
-    if (!contract) return null;
+  const checkUserRole = useCallback(async (medicalAccessContract, address) => {
+    if (!medicalAccessContract) return null;
     
     try {
       const [isAdmin, isDoctor, isPharmacist, isPatient] = await Promise.all([
-        contract.hasRole(await contract.ADMIN_ROLE(), address),
-        contract.hasRole(await contract.DOCTOR_ROLE(), address),
-        contract.hasRole(await contract.PHARMACIST_ROLE(), address),
-        contract.hasRole(await contract.PATIENT_ROLE(), address),
+        medicalAccessContract.hasRole(await medicalAccessContract.ADMIN_ROLE(), address),
+        medicalAccessContract.hasRole(await medicalAccessContract.DOCTOR_ROLE(), address),
+        medicalAccessContract.hasRole(await medicalAccessContract.PHARMACIST_ROLE(), address),
+        medicalAccessContract.hasRole(await medicalAccessContract.PATIENT_ROLE(), address),
       ]);
 
       if (isAdmin) return 'admin';
@@ -168,71 +195,73 @@ export const WalletProvider = ({ children }) => {
   }, []);
 
   const checkPatientRegistration = useCallback(async (address) => {
-      if (!contract) return false;
+      if (!contracts.medicalAccess) return false;
       try {
-        return await contract.hasRole(await contract.PATIENT_ROLE(), address);
+        return await contracts.medicalAccess.hasRole(await contracts.medicalAccess.PATIENT_ROLE(), address);
       } catch (err) {
         console.error("Registration check failed:", err);
         return false;
       }
-    }, [contract]);
+    }, [contracts.medicalAccess]);
 
     const getPatientCID = useCallback(async (patientAddress) => {
-      if (!contract) {
+      if (!contracts.medicalAccess) {
         throw new Error("Contract not connected");
       }
       
       try {
-        return await contract.getPatientCID(patientAddress);
+        return await contracts.medicalAccess.getPatientCID(patientAddress);
       } catch (error) {
         console.error('Failed to fetch patient CID:', error);
         throw error;
       }
-    }, [contract]);
+    }, [contracts.medicalAccess]);
 
   const checkPatientProfileComplete = useCallback(async (address) => {
-    if (!contract || !address) return false;
+    if (!contracts.medicalAccess || !address) return false;
 
     try {
       // First check if they have the patient role
-      const isPatient = await contract.hasRole(await contract.PATIENT_ROLE(), address);
+      const isPatient = await contracts.medicalAccess.hasRole(await contracts.medicalAccess.PATIENT_ROLE(), address);
       if (!isPatient) return false;
 
       // Then check if they have a CID stored
-      const cid = await contract.getPatientCID(address);
+      const cid = await contracts.medicalAccess.getPatientCID(address);
       return !!cid && cid !== '';
     } catch (err) {
       console.error("Profile check failed:", err);
       return false;
     }
-  }, [contract]);
+  }, [contracts.medicalAccess]);
+
 
   const handleAccountsChanged = useCallback(async (accounts) => {
-  try {
-    if (accounts.length === 0) {
-      // Wallet disconnected
-      setAccount(null);
-      setRole(null);
-      setContract(null);
-      setIsDisconnected(true);
-      return;
-    }
+    try {
+      if (accounts.length === 0) {
+        // Wallet disconnected
+        setAccount(null);
+        setRole(null);
+        setContract(null);
+        setIsDisconnected(true);
+        return;
+      }
 
-    // Wallet connected or account changed
-    setIsDisconnected(false);
-    const provider = new ethers.BrowserProvider(window.ethereum);
-    const contract = await initContract(provider);
-    const userRole = await checkUserRole(contract, accounts[0]);
-    
-    setAccount(accounts[0]);
-    setRole(userRole);
-    setContract(contract);
-    setError(null);
-  } catch (error) {
-    console.error("Account change error:", error);
-    setError(error.message || "Failed to handle account change");
-  }
-}, [initContract, checkUserRole]);
+      // Wallet connected or account changed
+      setIsDisconnected(false);
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const contract = await initContracts(provider);
+      const userRole = await checkUserRole(contract.medicalAccess, accounts[0]);
+      
+      setAccount(accounts[0]);
+      setRole(userRole);
+      setContract(contract);
+      setError(null);
+    } catch (error) {
+      console.error("Account change error:", error);
+      setError(error.message || "Failed to handle account change");
+    }
+  }, [initContracts, checkUserRole]);
+
 
   const connectWallet = useCallback(async () => {
     if (!window.ethereum) {
@@ -260,19 +289,19 @@ export const WalletProvider = ({ children }) => {
   }, [handleAccountsChanged]);
 
   const registerAsPatient = useCallback(async () => {
-    if (!contract || !account) {
+    if (!contracts.medicalAccess || !account) {
       throw new Error("Wallet not connected");
     }
 
     try {
       // Check if already registered
-      const isPatient = await contract.hasRole(await contract.PATIENT_ROLE(), account);
+      const isPatient = await contracts.medicalAccess.hasRole(await contracts.medicalAccess.PATIENT_ROLE(), account);
       if (isPatient) {
         return { success: true, isNew: false };
       }
 
       // Register new patient
-      const tx = await contract.registerPatient({
+      const tx = await contracts.medicalAccess.registerPatient({
         gasLimit: 500000
       });
       await tx.wait();
@@ -285,7 +314,7 @@ export const WalletProvider = ({ children }) => {
       console.error('Registration error:', error);
       throw error;
     }
-  }, [contract, account]);
+  }, [contracts.medicalAccess, account]);
 
   const parseRegistrationError = (error) => {
     if (error.code === 4001) {
@@ -300,15 +329,22 @@ export const WalletProvider = ({ children }) => {
     return new Error('Registration failed. Please try again.');
   };
 
+  const getContract = useCallback((contractName) => {
+    if (!contracts[contractName]) {
+      throw new Error(`Contract ${contractName} not initialized`);
+    }
+    return contracts[contractName];
+  }, [contracts]);
+
   const grantTemporaryAccess = useCallback(async (doctorAddress, dataFields, duration) => {
-    if (!contract || !account) {
+    if (!contracts.medicalAccess || !account) {
       throw new Error("Wallet not connected");
     }
     if (duration === 0) {
       duration = 3155760000
     }
     try {
-      const tx = await contract.grantTemporaryAccess(
+      const tx = await contracts.medicalAccess.grantTemporaryAccess(
         doctorAddress,
         dataFields,
         duration,
@@ -320,16 +356,17 @@ export const WalletProvider = ({ children }) => {
       console.error('Access grant error:', error);
       throw error;
     }
-  }, [contract, account]);
+  }, [contracts.medicalAccess, account]);
 
-  const extendAccess = useCallback(async (requestId, additionalDuration) => {
-    if (!contract || !account) {
+  const extendAccess = useCallback(async (requestId, doctor, additionalDuration) => {
+    if (!contracts.medicalAccess || !account) {
       throw new Error("Wallet not connected");
     }
 
     try {
-      const tx = await contract.extendAccess(
+      const tx = await contracts.medicalAccess.extendAccess(
         requestId,
+        doctor,
         additionalDuration,
         { gasLimit: 500000 }
       );
@@ -339,16 +376,17 @@ export const WalletProvider = ({ children }) => {
       console.error('Access extension error:', error);
       throw error;
     }
-  }, [contract, account]);
+  }, [contracts.medicalAccess, account]);
 
-  const revokeAccessEarly = useCallback(async (requestId) => {
-    if (!contract || !account) {
+  const revokeAccessEarly = useCallback(async (requestId, doctor) => {
+    if (!contracts.medicalAccess || !account) {
       throw new Error("Wallet not connected");
     }
 
     try {
-      const tx = await contract.revokeAccessEarly(
+      const tx = await contracts.medicalAccess.revokeAccessEarly(
         requestId,
+        doctor,
         { gasLimit: 500000 }
       ); 
       await tx.wait();
@@ -357,24 +395,23 @@ export const WalletProvider = ({ children }) => {
       console.error('Access revocation error:', error);
       throw error;
     }
-  }, [contract, account]);
+  }, [contracts.medicalAccess, account]);
 
-  const getActivePermissions = useCallback(async () => {
-    if (!contract || !account) {
+  const getPatientPermissions = useCallback(async () => {
+    if (!contracts.medicalAccess || !account) {
       throw new Error("Wallet not connected");
     }
 
     try {
       // Get raw permissions from contract
-      const rawPermissions = await contract.getActivePermissions(account);
+      const rawPermissions = await contracts.medicalAccess.getPermissions(account);
       
       // Get doctor details in parallel
       const permissionsWithDetails = await Promise.all(
         rawPermissions.map(async perm => {
           try {
             // Fetch doctor details
-            console.log(perm);
-            const doctorProfile = await contract.getDoctor(perm.doctor);
+            const doctorProfile = await contracts.medicalAccess.getDoctor(perm.doctor);
             
             return {
               requestId: perm.requestId.toString(),
@@ -404,7 +441,7 @@ export const WalletProvider = ({ children }) => {
       console.error('Permission fetch error:', error);
       throw error;
     }
-  }, [contract, account]);
+  }, [contracts.medicalAccess, account]);
 
   useEffect(() => {
     if (!window.ethereum) {
@@ -418,8 +455,8 @@ export const WalletProvider = ({ children }) => {
       try {
         const accounts = await window.ethereum.request({ method: 'eth_accounts' });
         if (accounts.length > 0) {
-          const contract = await initContract(provider);
-          const userRole = await checkUserRole(contract, accounts[0]);
+          const { medicalAccess } = await initContracts(provider);
+          const userRole = await checkUserRole(medicalAccess, accounts[0]);
           setAccount(accounts[0]);
           setRole(userRole);
         }
@@ -439,7 +476,7 @@ export const WalletProvider = ({ children }) => {
         window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
       }
     };
-  }, [initContract, checkUserRole, handleAccountsChanged]);
+  }, [initContracts, checkUserRole, handleAccountsChanged]);
 
   const value = {
     account,
@@ -448,7 +485,9 @@ export const WalletProvider = ({ children }) => {
     isConnecting,
     error,
     shouldLogout,
+    contracts,
     contract,
+    getContract,
     connectWallet,
     isMetaMaskInstalled: !!window.ethereum,
     registerAsPatient,
@@ -461,7 +500,7 @@ export const WalletProvider = ({ children }) => {
     grantTemporaryAccess,
     extendAccess,
     revokeAccessEarly,
-    getActivePermissions,
+    getPatientPermissions,
     getPatientData
   };
 

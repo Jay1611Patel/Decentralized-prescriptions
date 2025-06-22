@@ -106,7 +106,7 @@ const EmptyState = styled.div`
 `;
 
 const ActivePermissions = ({ permissions, onRevoke, onExtend }) => {
-  const { revokeAccessEarly, extendAccess, contract } = useWallet();
+  const { revokeAccessEarly, extendAccess, contract, contracts } = useWallet();
   const [doctorInfo, setDoctorInfo] = useState({});
   const [extendingId, setExtendingId] = useState(null);
   const [revokingId, setRevokingId] = useState(null);
@@ -133,7 +133,7 @@ const ActivePermissions = ({ permissions, onRevoke, onExtend }) => {
       const entries = await Promise.all(
         permissions.map(async (perm) => {
           try {
-            const [_, __, name, specialization] = await contract.getDoctor(perm.doctor); // or perm[1]
+            const [_, __, name, specialization] = await contracts.medicalAccess.getDoctor(perm.doctor); // or perm[1]
             return [perm.doctor, { name, specialization }];
           } catch (err) {
             console.warn('Failed to fetch doctor data for', perm.doctor, err);
@@ -145,13 +145,13 @@ const ActivePermissions = ({ permissions, onRevoke, onExtend }) => {
     };
 
     if (permissions.length) fetchDoctorData();
-  }, [permissions, contract]);
+  }, [permissions, contracts.medicalAccess]);
 
-  const handleExtend = async (requestId) => {
+  const handleExtend = async (requestId, doctor) => {
     setExtendingId(requestId);
     setError('');
     try {
-      await extendAccess(requestId, 604800); // Extend by 1 week
+      await extendAccess(requestId, doctor, 604800); // Extend by 1 week
       onExtend();
     } catch (err) {
       setError(err.message);
@@ -160,11 +160,11 @@ const ActivePermissions = ({ permissions, onRevoke, onExtend }) => {
     }
   };
 
-  const handleRevoke = async (requestId) => {
+  const handleRevoke = async (requestId, doctor) => {
     setRevokingId(requestId);
     setError('');
     try {
-      await revokeAccessEarly(requestId);
+      await revokeAccessEarly(requestId, doctor);
       onRevoke();
     } catch (err) {
       setError(err.message);
@@ -211,14 +211,14 @@ const ActivePermissions = ({ permissions, onRevoke, onExtend }) => {
 
                 <ActionButtons>
                   <ExtendButton 
-                    onClick={() => handleExtend(perm.requestId)}
+                    onClick={() => handleExtend(perm.requestId, perm.doctor)}
                     disabled={!perm.isActive || extendingId === perm.requestId}
                   >
                     {extendingId === perm.requestId ? 'Extending...' : 'Extend'}
                   </ExtendButton>
                   
                   <RevokeButton 
-                    onClick={() => handleRevoke(perm.requestId)}
+                    onClick={() => handleRevoke(perm.requestId, perm.doctor)}
                     disabled={!perm.isActive || revokingId === perm.requestId}
                   >
                     {revokingId === perm.requestId ? 'Revoking...' : 'Revoke'}

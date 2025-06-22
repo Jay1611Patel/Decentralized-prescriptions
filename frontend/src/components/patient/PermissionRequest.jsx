@@ -155,7 +155,7 @@ const durationOptions = [
 ];
 
 const PermissionRequest = ({ onClose, onComplete }) => {
-  const { account, contract, grantTemporaryAccess } = useWallet();
+  const { account, contract, contracts, grantTemporaryAccess } = useWallet();
   const [doctors, setDoctors] = useState([]);
   const [selectedDoctor, setSelectedDoctor] = useState('');
   const [selectedData, setSelectedData] = useState([]);
@@ -165,12 +165,12 @@ const PermissionRequest = ({ onClose, onComplete }) => {
 
   useEffect(() => {
     const fetchDoctors = async () => {
-      if (!contract) return;
+      if (!contracts.medicalAccess) return;
       try {
-        const doctorList = await contract.getAllDoctors();
+        const doctorList = await contracts.medicalAccess.getAllDoctors();
         const doctorDetails = await Promise.all(
           doctorList.map(async addr => {
-            const profile = await contract.getDoctor(addr);
+            const profile = await contracts.medicalAccess.getDoctor(addr);
             return { 
               address: addr, 
               name: profile.name, 
@@ -185,7 +185,7 @@ const PermissionRequest = ({ onClose, onComplete }) => {
     };
     
     fetchDoctors();
-  }, [contract, account]);
+  }, [contracts.medicalAccess, account]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

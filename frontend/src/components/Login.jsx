@@ -98,6 +98,7 @@ const Login = () => {
     role, 
     loading, 
     contract,
+    contracts,
     isConnecting,
     error,
     connectWallet,
@@ -122,13 +123,13 @@ const Login = () => {
     if (account && role) {
       if (role === 'patient') {
         // Check if contract is available
-        if (!contract) {
+        if (!contracts.medicalAccess) {
           console.error('Contract not initialized');
           return;
         }
 
         // Check if CID is stored
-        contract.getPatientCID(account)
+        contracts.medicalAccess.getPatientCID(account)
           .then(cid => {
             if (!cid || cid === '') {
               navigate('/patient-signup');
@@ -144,7 +145,7 @@ const Login = () => {
         navigate(`/${role}-dashboard`);
       }
     }
-  }, [account, role, loading, navigate, shouldLogout, contract]);
+  }, [account, role, loading, navigate, shouldLogout, contracts.medicalAccess]);
 
   const handleConnect = async () => {
     try {

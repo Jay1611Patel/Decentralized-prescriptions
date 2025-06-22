@@ -116,10 +116,11 @@ interface IMedicalAccess {
 
     function extendAccess(
         uint256 requestId,
+        address doctor,
         uint256 additionalDuration
     ) external;
 
-    function revokeAccessEarly(uint256 requestId) external;
+    function revokeAccessEarly(uint256 requestId, address doctor) external;
 
     // Getters
     function getDoctor(
@@ -138,9 +139,15 @@ interface IMedicalAccess {
 
     function getPharmacistCount() external view returns (uint256);
 
-    function getActivePermissions(
-        address patient
-    ) external view returns (AccessPermission[] memory);
+    function getPatientPermissions()
+        external
+        view
+        returns (AccessPermission[] memory);
+
+    function getDoctorAccess()
+        external
+        view
+        returns (AccessPermission[] memory);
 
     // Registration Functions
     function registerDoctor(
