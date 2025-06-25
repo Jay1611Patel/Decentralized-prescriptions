@@ -33,14 +33,18 @@ const PrescriptionStatus = styled.span`
   border-radius: 4px;
   font-size: 0.875rem;
   font-weight: 600;
-  background-color: ${props => 
-    props.status === 'active' ? '#ebf8ff' : 
-    props.status === 'fulfilled' ? '#f0fff4' : 
-    '#fff5f5'};
-  color: ${props => 
-    props.status === 'active' ? '#3182ce' : 
-    props.status === 'fulfilled' ? '#38a169' : 
-    '#e53e3e'};
+  background-color: ${(props) =>
+    props.status === 'active'
+      ? '#ebf8ff'
+      : props.status === 'fulfilled'
+      ? '#f0fff4'
+      : '#fff5f5'};
+  color: ${(props) =>
+    props.status === 'active'
+      ? '#3182ce'
+      : props.status === 'fulfilled'
+      ? '#38a169'
+      : '#e53e3e'};
 `;
 
 const PrescriptionDetails = styled.div`
@@ -48,6 +52,7 @@ const PrescriptionDetails = styled.div`
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 1rem;
   margin-bottom: 1rem;
+  color: black;
 `;
 
 const DetailItem = styled.div`
@@ -71,8 +76,17 @@ const LoadingMessage = styled.p`
   padding: 2rem;
 `;
 
+const formatDate = (timestamp) => {
+  return new Date(Number(timestamp) * 1000).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+};
+
 const PrescriptionList = ({ patientAddress }) => {
   const [prescriptions, setPrescriptions] = useState([]);
+  const [doctorNames, setDoctorNames] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const { contracts } = useWallet();
@@ -85,42 +99,40 @@ const PrescriptionList = ({ patientAddress }) => {
       setError(null);
 
       try {
-        const prescriptionIds = await contracts.prescriptionRegistry.getPatientPrescriptions(patientAddress);
-        const fetchedPrescriptions = await Promise.all(
-           prescriptionIds.map(id => contracts.prescriptionRegistry.getPrescription(id))
+        const ids = await contracts.prescriptionRegistry.getPatientPrescriptions(patientAddress);
+
+        const all = await Promise.all(
+          ids.map(async (id) => {
+            const p = await contracts.prescriptionRegistry.getPrescription(id);
+            return {
+              id: id.toString(),
+              doctor: p[0],
+              patient: p[1],
+              issueDate: p[2],
+              expiryDate: p[3],
+              hash: p[4],
+              isFulfilled: p[5],
+              fulfilledBy: p[6],
+              fulfillmentDate: p[7],
+            };
+          })
         );
 
-        // Mock data for demonstration
-        const mockPrescriptions = [
-          {
-            id: 1,
-            doctor: 'Dr. Smith',
-            doctorAddress: '0x123...456',
-            medication: 'Ibuprofen 400mg',
-            dosage: '1 tablet every 6 hours as needed',
-            issueDate: '2023-10-15',
-            expiryDate: '2024-01-15',
-            isFulfilled: false,
-            fulfilledBy: null,
-            fulfillmentDate: null,
-            notes: 'For headache and fever'
-          },
-          {
-            id: 2,
-            doctor: 'Dr. Johnson',
-            doctorAddress: '0x789...012',
-            medication: 'Amoxicillin 500mg',
-            dosage: '1 capsule every 8 hours for 7 days',
-            issueDate: '2023-09-20',
-            expiryDate: '2023-10-20',
-            isFulfilled: true,
-            fulfilledBy: 'City Pharmacy',
-            fulfillmentDate: '2023-09-21',
-            notes: 'For bacterial infection'
-          }
-        ];
+        const uniqueDoctors = [...new Set(all.map(p => p.doctor))];
+        const names = {};
 
-        setPrescriptions(fetchedPrescriptions);
+        for (const address of uniqueDoctors) {
+          try {
+            const doc = await contracts.medicalAccess.getDoctor(address);
+            const name = doc.name || `Doctor (${address.slice(0, 6)}...${address.slice(-4)})`;
+            names[address] = name;
+          } catch (e) {
+            names[address] = `Doctor (${address.slice(0, 6)}...${address.slice(-4)})`;
+          }
+        }
+
+        setDoctorNames(names);
+        setPrescriptions(all);
       } catch (err) {
         console.error('Failed to fetch prescriptions:', err);
         setError('Failed to load prescriptions. Please try again.');
@@ -130,86 +142,42 @@ const PrescriptionList = ({ patientAddress }) => {
     };
 
     fetchPrescriptions();
-  }, [contracts.prescriptionRegistry, patientAddress]);
+  }, [contracts.prescriptionRegistry, contracts.medicalAccess, patientAddress]);
 
   const getStatus = (prescription) => {
-    const now = new Date();
-    const expiryDate = new Date(Number(prescription.expiryDate));
-    console.log(`Now: ${now}`);
-    console.log(`Expiry: ${expiryDate}`);
-    
+    const now = Math.floor(Date.now() / 1000);
+    const expiry = Number(prescription.expiryDate);
     if (prescription.isFulfilled) return 'fulfilled';
-    if (now > expiryDate) return 'expired';
+    if (now > expiry) return 'expired';
     return 'active';
   };
 
-  if (isLoading) {
-    return <LoadingMessage>Loading prescriptions...</LoadingMessage>;
-  }
-
-  if (error) {
-    return <EmptyMessage>{error}</EmptyMessage>;
-  }
-
-  if (prescriptions.length === 0) {
-    return <EmptyMessage>No prescriptions found</EmptyMessage>;
-  }
+  if (isLoading) return <LoadingMessage>Loading prescriptions...</LoadingMessage>;
+  if (error) return <EmptyMessage>{error}</EmptyMessage>;
+  if (prescriptions.length === 0) return <EmptyMessage>No prescriptions found</EmptyMessage>;
 
   return (
     <PrescriptionContainer>
-      {prescriptions.map((prescription) => {
-        const status = getStatus(prescription);
-        
+      {prescriptions.map((p) => {
+        const status = getStatus(p);
         return (
-          <PrescriptionCard key={prescription.id}>
+          <PrescriptionCard key={p.id}>
             <PrescriptionHeader>
-              <PrescriptionTitle>
-                {prescription.medication}
-              </PrescriptionTitle>
-              <PrescriptionStatus status={status}>
-                {status === 'active' && 'Active'}
-                {status === 'fulfilled' && 'Fulfilled'}
-                {status === 'expired' && 'Expired'}
-              </PrescriptionStatus>
+              <PrescriptionTitle>Prescription #{p.id}</PrescriptionTitle>
+              <PrescriptionStatus status={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</PrescriptionStatus>
             </PrescriptionHeader>
-
             <PrescriptionDetails>
-              <DetailItem>
-                <strong>Prescribed by</strong>
-                {prescription.doctor}
-              </DetailItem>
-              <DetailItem>
-                <strong>Date Issued</strong>
-                {prescription.issueDate}
-              </DetailItem>
-              <DetailItem>
-                <strong>Expiry Date</strong>
-                {prescription.expiryDate}
-              </DetailItem>
-              <DetailItem>
-                <strong>Dosage</strong>
-                {prescription.dosage}
-              </DetailItem>
-              {prescription.isFulfilled && (
+              <DetailItem><strong>Doctor</strong>{doctorNames[p.doctor] || p.doctor}</DetailItem>
+              <DetailItem><strong>Issued</strong>{formatDate(p.issueDate)}</DetailItem>
+              <DetailItem><strong>Expires</strong>{formatDate(p.expiryDate)}</DetailItem>
+              <DetailItem><strong>Status</strong>{status}</DetailItem>
+              {p.isFulfilled && (
                 <>
-                  <DetailItem>
-                    <strong>Fulfilled by</strong>
-                    {prescription.fulfilledBy}
-                  </DetailItem>
-                  <DetailItem>
-                    <strong>Fulfillment Date</strong>
-                    {prescription.fulfillmentDate}
-                  </DetailItem>
+                  <DetailItem><strong>Fulfilled By</strong>{p.fulfilledBy}</DetailItem>
+                  <DetailItem><strong>Fulfillment Date</strong>{formatDate(p.fulfillmentDate)}</DetailItem>
                 </>
               )}
             </PrescriptionDetails>
-
-            {prescription.notes && (
-              <DetailItem>
-                <strong>Notes</strong>
-                {prescription.notes}
-              </DetailItem>
-            )}
           </PrescriptionCard>
         );
       })}

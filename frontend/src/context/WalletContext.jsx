@@ -109,6 +109,50 @@ export const WalletProvider = ({ children }) => {
     }
   }, [account, contracts.medicalAccess]);
 
+  const storeToIPFS = async (data) => {
+    try {
+      // Using Pinata cloud (requires API keys)
+      const response = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_PINATA_JWT}`
+        },
+        body: JSON.stringify({
+          pinataContent: data,
+          pinataMetadata: {
+            name: `prescription-${Date.now()}`
+          }
+        })
+      });
+
+      if (!response.ok) throw new Error('Pinata upload failed');
+      const result = await response.json();
+      return result.IpfsHash; // Returns the IPFS CID
+    } catch (error) {
+      console.error("IPFS upload failed:", error);
+      throw error;
+    }
+  };
+
+  const getFromIPFS = async (cid) => {
+    const gateways = [
+      `https://gateway.pinata.cloud/ipfs/${cid}`,
+      `https://ipfs.io/ipfs/${cid}`,
+      `https://${cid}.ipfs.dweb.link`
+    ];
+
+    for (const gateway of gateways) {
+      try {
+        const response = await fetch(gateway);
+        if (response.ok) return await response.json();
+      } catch (e) {
+        console.warn(`Failed with gateway ${gateway}:`, e);
+      }
+    }
+    throw new Error('All IPFS gateways failed');
+  };
+
   const getPatientData = useCallback(async (cid) => {
     if (!cid) return null;
 
