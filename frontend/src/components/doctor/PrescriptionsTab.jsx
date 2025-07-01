@@ -197,6 +197,7 @@ const PrescriptionsTab = ({ showNewPrescription, onClose }) => {
         const data = await Promise.all(
           ids.map(async id => {
             const p = await contracts.prescriptionRegistry.getPrescription(id);
+            
             return {
               id: id.toString(),
               doctor: p[0],
@@ -269,11 +270,8 @@ const PrescriptionsTab = ({ showNewPrescription, onClose }) => {
         throw new Error('Invalid patient address');
       }
       
-      // Calculate expiry date (current timestamp + days in seconds)
-      const expiryDate = Math.floor(Date.now() / 1000) + (parseInt(formData.expiryDays) * 86400);
-      
-      // Create prescription hash (in a real app, this would be stored off-chain)
-      const prescriptionHash = ethers.id(JSON.stringify({
+      // Create structured prescription data
+      const prescriptionData = {
         medication: formData.medication,
         dosage: formData.dosage,
         frequency: formData.frequency,
@@ -282,16 +280,21 @@ const PrescriptionsTab = ({ showNewPrescription, onClose }) => {
         issuedBy: account,
         issuedTo: selectedPatient,
         timestamp: Date.now()
-      }));
+      };
+
+      // Stringify the data (don't hash it)
+      const prescriptionDataString = JSON.stringify(prescriptionData);
       
-      // Call the contract
+      // Calculate expiry date
+      const expiryDate = Math.floor(Date.now() / 1000) + (parseInt(formData.expiryDays) * 86400);
+      
+      // Call the contract with the JSON string
       const tx = await contracts.prescriptionRegistry.createPrescription(
         selectedPatient,
         expiryDate,
-        prescriptionHash,
+        prescriptionDataString, // Store the actual data, not hash
         { gasLimit: 1000000 }
       );
-      console.log(tx);
       
       await tx.wait();
       
